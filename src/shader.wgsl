@@ -15,11 +15,12 @@ struct Sphere {
     center: vec3<f32>;
 };
 
-struct Foo {
+struct Spheres {
+    lenght: i32;
     spheres: array<Sphere>;
 };
 
-[[group(0), binding(0)]] var<storage,read> spheres: Foo;
+[[group(0), binding(0)]] var<storage,read> spheres: Spheres;
 
 [[stage(vertex)]]
 fn vs_main(

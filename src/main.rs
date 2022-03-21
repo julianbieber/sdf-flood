@@ -1,9 +1,12 @@
+use encase::UniformBuffer;
 use wgpu::{util::DeviceExt, BindGroupLayoutDescriptor};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Fullscreen, WindowBuilder},
 };
+
+mod model;
 
 fn main() {
     env_logger::init();
@@ -78,6 +81,8 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    vertices: UniformBuffer<Vertex>,
+    spheres: UniformBuffer,
 }
 
 impl State {
@@ -193,7 +198,7 @@ impl State {
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
+            contents: VERTICES.split_last_mut,
             usage: wgpu::BufferUsages::VERTEX,
         });
 
@@ -259,8 +264,7 @@ impl State {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, encase::WgslType)]
 struct Vertex {
     position: [f32; 3],
     pixel: [f32; 2],
