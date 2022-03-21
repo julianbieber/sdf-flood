@@ -124,14 +124,29 @@ impl State {
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 1,
+                binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new((1024 * 16) as _),
+                    min_binding_size: None,
                 },
                 count: None,
+            }],
+        });
+
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("sphere buffer"),
+            contents: &[],
+            usage: wgpu::BufferUsages::STORAGE,
+        }); // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
             }],
         });
 
@@ -182,11 +197,6 @@ impl State {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let bind_group = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("sphere buffer"),
-            contents: &[],
-            usage: wgpu::BufferUsages::STORAGE,
-        }); // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
         Self {
             surface,
             device,

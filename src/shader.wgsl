@@ -13,11 +13,13 @@ struct VertexOutput {
 struct Sphere {
     color: vec4<f32>;
     center: vec3<f32>;
-    radius: f32;
 };
 
-@group(0) @binding(0)
-var<storage,read> spheres: array<Sphere>;
+struct Foo {
+    spheres: array<Sphere>;
+};
+
+[[group(0), binding(0)]] var<storage,read> spheres: Foo;
 
 [[stage(vertex)]]
 fn vs_main(
@@ -39,11 +41,12 @@ fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
     return  normalize(vec3<f32>((pixel.x - 0.5) * 1.7777, pixel.y - 0.5, 1.0));
 }
 
-fn sample_scene(point: vec3<f32>, scene: array<Sphere>) -> f32 {
-    var min_distance = 10000000.0;
-    for (var i: i32 = 0; i < arrayLength(scene); i = i + 1) {
+fn sample_scene(point: vec3<f32>)  -> f32 {
+    //var min_distance = 10000000.0;
+    //for (var i: i32 = 0; i < arrayLength(spheres.spheres); i = i + 1) {
+    
 
-    }
+    //}
     return length(point - vec3<f32>(0.0,0.0,2.0)) - 1.0;
 }
 
