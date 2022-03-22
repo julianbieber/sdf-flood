@@ -1,3 +1,5 @@
+use encase::ArrayLength;
+
 #[derive(encase::WgslType)]
 pub struct Vertex {
     pub position: [f32; 3],
@@ -54,15 +56,16 @@ pub struct Sphere {
 }
 
 #[derive(encase::WgslType)]
-struct Spheres {
-    length: i32,
+pub struct Spheres {
+    length: ArrayLength,
+    #[size(runtime)]
     spheres: Vec<Sphere>,
 }
 
 impl Spheres {
     pub fn new(capacity: usize) -> Spheres {
         Spheres {
-            length: 0,
+            length: ArrayLength,
             spheres: Vec::with_capacity(capacity),
         }
     }

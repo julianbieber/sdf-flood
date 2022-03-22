@@ -16,7 +16,7 @@ struct Sphere {
 };
 
 struct Spheres {
-    lenght: i32;
+    length: u32;
     spheres: array<Sphere>;
 };
 

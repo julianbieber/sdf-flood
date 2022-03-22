@@ -1,12 +1,13 @@
+mod model;
+mod render_pipeline;
 use encase::UniformBuffer;
+use model::{Spheres, Vertex};
 use wgpu::{util::DeviceExt, BindGroupLayoutDescriptor};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Fullscreen, WindowBuilder},
 };
-
-mod model;
 
 fn main() {
     env_logger::init();
@@ -32,7 +33,10 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    let mut state = pollster::block_on(State::new(&window));
+    let vertices = todo!();
+    let spheres = todo!();
+
+    let mut state = pollster::block_on(State::new(&window, &vertices, &spheres));
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
@@ -82,12 +86,12 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertices: UniformBuffer<Vertex>,
-    spheres: UniformBuffer,
+    spheres: UniformBuffer<Spheres>,
 }
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &Window) -> Self {
+    async fn new(window: &Window, vertices: &Vec<Vertex>, spheres: &Spheres) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
         let surface = unsafe { instance.create_surface(window) };
@@ -161,40 +165,12 @@ impl State {
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("render pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }],
-            }),
-            multiview: None,
-        });
+        let render_pipeline =
+            device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
+                &shader,
+                &render_pipeline_layout,
+                config.format,
+            ));
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
@@ -263,49 +239,3 @@ impl State {
         Ok(())
     }
 }
-
-#[derive(Clone, Copy, Debug, encase::WgslType)]
-struct Vertex {
-    position: [f32; 3],
-    pixel: [f32; 2],
-}
-
-impl Vertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-1.0, 1.0, 0.0],
-        pixel: [0.0, 1.0],
-    },
-    Vertex {
-        position: [-1.0, -1.0, 0.0],
-        pixel: [0.0, 0.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 0.0],
-        pixel: [1.0, 0.0],
-    },
-    Vertex {
-        position: [-1.0, 1.0, 0.0],
-        pixel: [0.0, 1.0],
-    },
-    Vertex {
-        position: [1.0, -1.0, 0.0],
-        pixel: [1.0, 0.0],
-    },
-    Vertex {
-        position: [1.0, 1.0, 0.0],
-        pixel: [1.0, 1.0],
-    },
-];
