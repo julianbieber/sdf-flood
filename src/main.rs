@@ -1,7 +1,6 @@
 mod model;
 mod render_pipeline;
-use encase::UniformBuffer;
-use model::{Spheres, Vertex};
+use model::{Sphere, Vertex};
 use wgpu::{util::DeviceExt, BindGroupLayoutDescriptor};
 use winit::{
     event::*,
@@ -12,29 +11,76 @@ use winit::{
 fn main() {
     env_logger::init();
     let event_loop = EventLoop::new();
-    for vm in event_loop
+    let mut video_modes: Vec<_> = event_loop
         .available_monitors()
         .next()
         .unwrap()
         .video_modes()
-    {
-        dbg!(vm);
-    }
+        .collect();
+    video_modes.sort_by_key(|a| a.size().height * a.size().width);
+    dbg!(video_modes.last());
     let window = WindowBuilder::new()
         .with_fullscreen(Some(Fullscreen::Exclusive(
-            event_loop
-                .available_monitors()
-                .next()
-                .unwrap()
-                .video_modes()
-                .next()
-                .unwrap(),
+            video_modes.last().unwrap().clone(),
         )))
         .build(&event_loop)
         .unwrap();
 
-    let vertices = todo!();
-    let spheres = todo!();
+    let vertices = Vertex::square();
+    let spheres = vec![
+        model::Sphere {
+            radius: 1.5,
+            center: mint::Vector3 {
+                x: 0.0f32,
+                y: -2.5f32,
+                z: 5.0f32,
+            },
+            color: mint::Vector3 {
+                x: 1.0f32,
+                y: 1.0f32,
+                z: 1.0f32,
+            },
+        },
+        model::Sphere {
+            radius: 1.0,
+            center: mint::Vector3 {
+                x: 0.0f32,
+                y: 0.0f32,
+                z: 5.0f32,
+            },
+            color: mint::Vector3 {
+                x: 1.0f32,
+                y: 1.0f32,
+                z: 1.0f32,
+            },
+        },
+        model::Sphere {
+            radius: 0.5,
+            center: mint::Vector3 {
+                x: 0.0f32,
+                y: 1.5f32,
+                z: 5.0f32,
+            },
+            color: mint::Vector3 {
+                x: 1.0f32,
+                y: 1.0f32,
+                z: 1.0f32,
+            },
+        },
+        model::Sphere {
+            color: mint::Vector3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            center: mint::Vector3 {
+                x: -0.1,
+                y: 1.6,
+                z: 4.5f32,
+            },
+            radius: 0.1,
+        },
+    ];
 
     let mut state = pollster::block_on(State::new(&window, &vertices, &spheres));
     event_loop.run(move |event, _, control_flow| match event {
@@ -85,13 +131,14 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    vertices: UniformBuffer<Vertex>,
-    spheres: UniformBuffer<Spheres>,
+    vertices: Vec<u8>,
+    num_vertices: usize,
+    spheres: Vec<u8>,
 }
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &Window, vertices: &Vec<Vertex>, spheres: &Spheres) -> Self {
+    async fn new(window: &Window, vertices: &Vec<Vertex>, spheres: &Vec<Sphere>) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
         let surface = unsafe { instance.create_surface(window) };
@@ -144,9 +191,15 @@ impl State {
             }],
         });
 
+        let mut spheres_bytes = vec![];
+        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
+        sphere_bytes_writer
+            .write_iter(spheres.iter().cloned())
+            .unwrap();
+        dbg!(spheres_bytes.len());
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sphere buffer"),
-            contents: &[],
+            contents: &spheres_bytes[..],
             usage: wgpu::BufferUsages::STORAGE,
         }); // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
 
@@ -169,12 +222,22 @@ impl State {
             device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
                 &shader,
                 &render_pipeline_layout,
-                config.format,
+                &[wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+                &[Vertex::desc()],
             ));
-
+        let mut vertex_bytes = vec![];
+        let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
+        vertex_bytes_writer
+            .write_iter(vertices.iter().cloned())
+            .unwrap();
+        dbg!(vertex_bytes.len());
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
-            contents: VERTICES.split_last_mut,
+            contents: &vertex_bytes[..],
             usage: wgpu::BufferUsages::VERTEX,
         });
 
@@ -187,6 +250,9 @@ impl State {
             render_pipeline,
             vertex_buffer,
             bind_group,
+            vertices: vertex_bytes,
+            spheres: spheres_bytes,
+            num_vertices: vertices.len(),
         }
     }
 
@@ -232,7 +298,7 @@ impl State {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_bind_group(0, &self.bind_group, &[]);
-            render_pass.draw(0..VERTICES.len() as u32, 0..1);
+            render_pass.draw(0..self.num_vertices as u32, 0..1);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

@@ -13,15 +13,14 @@ struct VertexOutput {
 struct Sphere {
     color: vec4<f32>;
     center: vec3<f32>;
+    radius: f32;
 };
 
 struct Spheres {
-    length: u32;
-    spheres: array<Sphere>;
+    spheres: [[stride(32)]] array<Sphere>;
 };
 
 [[group(0), binding(0)]] var<storage,read> spheres: Spheres;
-
 [[stage(vertex)]]
 fn vs_main(
     model: VertexInput,
@@ -42,13 +41,22 @@ fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
     return  normalize(vec3<f32>((pixel.x - 0.5) * 1.7777, pixel.y - 0.5, 1.0));
 }
 
-fn sample_scene(point: vec3<f32>)  -> f32 {
-    //var min_distance = 10000000.0;
-    //for (var i: i32 = 0; i < arrayLength(spheres.spheres); i = i + 1) {
-    
+struct RayHit {
+    distance: f32;
+    color: vec4<f32>;
+};
 
-    //}
-    return length(point - vec3<f32>(0.0,0.0,2.0)) - 1.0;
+fn sample_scene(point: vec3<f32>)  -> RayHit {
+    var hit = RayHit(100000000.0, vec4<f32>(0.0, 0.0, 0.0, 0.0));
+    for (var i: u32 = 0u; i < arrayLength(&spheres.spheres); i = i + 1u) {
+        let sphere = spheres.spheres[i];
+        let d = length(point - sphere.center) - sphere.radius;
+        if (d < hit.distance) {
+            hit.distance = d;
+            hit.color = sphere.color;
+        }
+    }
+    return hit; //length(point - vec3<f32>(0.0,0.0,2.0)) - 1.0;
 }
 
 [[stage(fragment)]]
@@ -58,11 +66,11 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     var ray_dir = ray_direction(in.uv);
     var ray_pos = eye;
     
-    for (var i:i32 = 0; i < 128; i = i+ 1) {
-        let distance_to_scene = sample_scene(ray_pos);
-        ray_pos = ray_pos + (ray_dir) * distance_to_scene;
-        if (distance_to_scene <= 0.0) {
-            return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    for (var i:i32 = 0; i < 64; i = i+ 1) {
+        let hit = sample_scene(ray_pos);
+        ray_pos = ray_pos + (ray_dir * hit.distance);
+        if (hit.distance <= 0.001) {
+            return hit.color; // vec4<f32>(0.0, 0.0, 0.0, 1.0);
         }
     }
 
