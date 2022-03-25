@@ -38,7 +38,7 @@ fn to_rad(deg: f32) -> f32 {
 }
 
 fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
-    return  normalize(vec3<f32>((pixel.x - 0.5) * 1.7777, pixel.y - 0.5, 1.0));
+    return  normalize(vec3<f32>(((pixel.x - 0.5) * 1.7777) * 1.6, (pixel.y - 0.5) * 1.6, 1.0));
 }
 
 struct RayHit {
@@ -74,11 +74,6 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
         }
     }
 
-    return vec4<f32>(in.uv.x, in.uv.y, 0.0, 1.0);
+    return vec4<f32>(0.53, 0.8, 0.92, 1.0);
 }
 
-
-
-
-
- 

@@ -80,6 +80,45 @@ fn main() {
             },
             radius: 0.1,
         },
+        model::Sphere {
+            color: mint::Vector3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            center: mint::Vector3 {
+                x: 0.1,
+                y: 1.6,
+                z: 4.5f32,
+            },
+            radius: 0.1,
+        },
+        model::Sphere {
+            color: mint::Vector3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            center: mint::Vector3 {
+                x: 0.0,
+                y: 1.3,
+                z: 4.5f32,
+            },
+            radius: 0.1,
+        },
+        model::Sphere {
+            color: mint::Vector3 {
+                x: 0.3,
+                y: 0.8,
+                z: 0.27,
+            },
+            center: mint::Vector3 {
+                x: 0.0,
+                y: -50.0,
+                z: 20.0,
+            },
+            radius: 50.0,
+        },
     ];
 
     let mut state = pollster::block_on(State::new(&window, &vertices, &spheres));
