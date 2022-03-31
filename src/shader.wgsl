@@ -21,6 +21,8 @@ struct Spheres {
 };
 
 [[group(0), binding(0)]] var<storage,read> spheres: Spheres;
+[[group(0), binding(1)]] var<storage,read> light_spheres: Spheres;
+
 [[stage(vertex)]]
 fn vs_main(
     model: VertexInput,
@@ -30,6 +32,7 @@ fn vs_main(
     out.clip_position = vec4<f32>(model.position, 1.0);
     return out;
 }
+
 let fov = 75.0;
 let pi = 3.14159265359;
 
@@ -46,17 +49,25 @@ struct RayHit {
     color: vec4<f32>;
 };
 
-fn sample_scene(point: vec3<f32>)  -> RayHit {
-    var hit = RayHit(100000000.0, vec4<f32>(0.0, 0.0, 0.0, 0.0));
-    for (var i: u32 = 0u; i < arrayLength(&spheres.spheres); i = i + 1u) {
-        let sphere = spheres.spheres[i];
+fn init_hit() -> RayHit {
+    return RayHit(100000.0, vec4<f32>(0.0,0.0,0.0,0.0));
+}
+
+fn is_hit(h: RayHit) -> bool {
+    return h.distance < 0.001;
+}
+
+fn sample(point: vec3<f32>, s: ptr<array<Sphere>>) -> RayHit {
+    var hit = init_hit();
+    for (var i: u32 = 0u; i < arrayLength(s); i = i + 1u) {
+        let sphere = s[i];
         let d = length(point - sphere.center) - sphere.radius;
         if (d < hit.distance) {
             hit.distance = d;
             hit.color = sphere.color;
         }
     }
-    return hit; //length(point - vec3<f32>(0.0,0.0,2.0)) - 1.0;
+    return hit;
 }
 
 [[stage(fragment)]]
@@ -66,12 +77,12 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     var ray_dir = ray_direction(in.uv);
     var ray_pos = eye;
     
-    for (var i:i32 = 0; i < 64; i = i+ 1) {
-        let hit = sample_scene(ray_pos);
-        ray_pos = ray_pos + (ray_dir * hit.distance);
-        if (hit.distance <= 0.001) {
+    for (var i:i32 = 0; i < 64; i = i + 1) {
+        let hit = sample(ray_pos, spheres.spheres);
+        if (is_hit(hit)) {
             return hit.color; // vec4<f32>(0.0, 0.0, 0.0, 1.0);
         }
+        ray_pos = ray_pos + (ray_dir * hit.distance);
     }
 
     return vec4<f32>(0.53, 0.8, 0.92, 1.0);
