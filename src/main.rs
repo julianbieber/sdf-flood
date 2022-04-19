@@ -40,6 +40,7 @@ fn main() {
                 y: 1.0f32,
                 z: 1.0f32,
             },
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             radius: 1.0,
@@ -53,6 +54,7 @@ fn main() {
                 y: 1.0f32,
                 z: 1.0f32,
             },
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             radius: 0.5,
@@ -66,6 +68,7 @@ fn main() {
                 y: 1.0f32,
                 z: 1.0f32,
             },
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             color: mint::Vector3 {
@@ -79,6 +82,7 @@ fn main() {
                 z: 4.5f32,
             },
             radius: 0.1,
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             color: mint::Vector3 {
@@ -92,6 +96,7 @@ fn main() {
                 z: 4.5f32,
             },
             radius: 0.1,
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             color: mint::Vector3 {
@@ -105,6 +110,7 @@ fn main() {
                 z: 4.5f32,
             },
             radius: 0.1,
+            reflectivity: 0.0f32,
         },
         model::Sphere {
             color: mint::Vector3 {
@@ -118,14 +124,15 @@ fn main() {
                 z: 20.0,
             },
             radius: 50.0,
+            reflectivity: 0.0f32,
         },
     ];
 
     let light_spheres = vec![model::Sphere {
         color: mint::Vector3 {
-            x: 0.9,
-            y: 0.0,
-            z: 0.27,
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
         },
         center: mint::Vector3 {
             x: 0.0,
@@ -133,6 +140,7 @@ fn main() {
             z: 0.0,
         },
         radius: 1.0,
+        reflectivity: 0.0f32,
     }];
 
     let mut state = pollster::block_on(State::new(&window, &vertices, &spheres, &light_spheres));

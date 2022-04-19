@@ -14,10 +14,11 @@ struct Sphere {
     color: vec3<f32>;
     center: vec3<f32>;
     radius: f32;
+    reflectivity: f32;
 };
 
 struct Spheres {
-    spheres: [[stride(32)]] array<Sphere>;
+    spheres: [[stride(48)]] array<Sphere>;
 };
 
 [[group(0), binding(0)]] var<storage,read> spheres: Spheres;
@@ -132,22 +133,23 @@ fn sample_light_rays(start: vec3<f32>) -> RayMarchingResult {
 }
 
 
-fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32, recursion_depth: i32) -> RayMarchingResult {
-    if (recursion_depth < 10) {
-        var pos = start;
-        for (var i:i32 = 0; i < iterations; i = i + 1) {
-            let hit = sample_scene(pos);
-            if (is_hit(hit)) {
-                var light_hit = sample_light_rays(pos);
-                if (light_hit.lightHit) {
-                    return RayMarchingResult(hit.color * light_hit.color, true, true); 
-                } else {
-                    return RayMarchingResult(vec3<f32>(0.0, 0.0, 0.0), true, false);                 
-                }
+fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32, strength: f32) -> RayMarchingResult {
+    var pos = start;
+    for (var i:i32 = 0; i < iterations; i = i + 1) {
+        let hit = sample_scene(pos);
+        if (is_hit(hit)) {
+            var light_hit = sample_light_rays(pos);
+            var h = RayMarchingResult(vec3<f32>(0.0, 0.0, 0.0), true, false);
+            if (light_hit.lightHit) {
+                h =  RayMarchingResult((hit.color * light_hit.color) * strength, true, true); 
             }
-            pos = pos + (dir * hit.distance);
+            
+            if (strength > 0.1) {
+                ver rec = ray_marching(pos, TODO, iterations, strength * h);
+            }
+            return h;
         }
-        
+        pos = pos + (dir * hit.distance);
     }
     
     return RayMarchingResult(vec3<f32>(0.0, 0.0, 0.0), false, false);
@@ -156,6 +158,6 @@ fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32, recursion_dep
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(in.uv), 64, 0).color, 1.0);
+    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(in.uv), 64, 1.0).color, 1.0);
 }
 

@@ -78,4 +78,5 @@ pub struct Sphere {
     pub color: mint::Vector3<f32>,
     pub center: mint::Vector3<f32>,
     pub radius: f32,
+    pub reflectivity: f32,
 }
