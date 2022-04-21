@@ -1,37 +1,37 @@
 struct VertexInput {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] uv: vec2<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) uv: vec2<f32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] uv: vec2<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
 };
 
 
 
 struct Sphere {
-    color: vec3<f32>;
-    center: vec3<f32>;
-    radius: f32;
-    reflectivity: f32;
+    color: vec3<f32>,
+    center: vec3<f32>,
+    radius: f32,
+    reflectivity: f32,
 };
 
 struct Spheres {
-    spheres: [[stride(48)]] array<Sphere>;
+    spheres: array<Sphere>,
 };
 
-[[group(0), binding(0)]] var<storage,read> spheres: Spheres;
-[[group(0), binding(1)]] var<storage,read> light_spheres: Spheres;
+@group(0) @binding(0) var<storage,read> spheres: Spheres;
+@group(0) @binding(1) var<storage,read> light_spheres: Spheres;
 
-[[stage(vertex)]]
+@vertex
 fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
-    var out: VertexOutput;
-    out.uv = model.uv;
-    out.clip_position = vec4<f32>(model.position, 1.0);
-    return out;
+    var o: VertexOutput;
+    o.uv = model.uv;
+    o.clip_position = vec4<f32>(model.position, 1.0);
+    return o;
 }
 
 let fov = 75.0;
@@ -46,60 +46,73 @@ fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
 }
 
 struct RayHit {
-    distance: f32;
-    color: vec3<f32>;
-    light: bool;
+    distance: f32,
+    color: vec3<f32>,
+    light: bool,
+    reflectiviy: f32,
 };
 
 struct RayMarchingResult {
-    color: vec3<f32>;
-    hit: bool;
-    lightHit: bool;  
+    color: vec3<f32>,
+    hit: bool,
+    lightHit: bool,  
 };
 
 fn init_hit() -> RayHit {
-    return RayHit(100000.0, vec3<f32>(0.0,0.0,0.0), false);
+    return RayHit(100000.0, vec3<f32>(0.0,0.0,0.0), false, 0.0);
 }
 
 fn is_hit(h: RayHit) -> bool {
     return h.distance < 0.001;
 }
 
-fn sample_spheres(point: vec3<f32>) -> RayHit {
+fn sample_spheres(p: vec3<f32>) -> RayHit {
     var hit = init_hit();
     for (var i: u32 = 0u; i < arrayLength(&spheres.spheres); i = i + 1u) {
         let sphere = spheres.spheres[i];
-        let d = length(point - sphere.center) - sphere.radius;
+        let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
             hit.distance = d;
             hit.color = sphere.color;
+            hit.reflectiviy = sphere.reflectivity;
         }
     }
     return hit;
 }
 
-fn sample_lights(point: vec3<f32>) -> RayHit {
+fn sample_lights(p: vec3<f32>) -> RayHit {
     var hit = init_hit();
     hit.light = true;
     for (var i: u32 = 0u; i < arrayLength(&light_spheres.spheres); i = i + 1u) {
         let sphere = light_spheres.spheres[i];
-        let d = length(point - sphere.center) - sphere.radius;
+        let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
             hit.distance = d;
             hit.color = sphere.color;
+            hit.reflectiviy = sphere.reflectivity;
         }
     }
     return hit;
 }
 
-fn sample_scene(point: vec3<f32>) -> RayHit {
-    var l = sample_lights(point);
-    var s = sample_spheres(point);
+fn sample_scene(p: vec3<f32>) -> RayHit {
+    var l = sample_lights(p);
+    var s = sample_spheres(p);
     if (l.distance < s.distance) {
         return l;
     } else {
         return s;
     }
+}
+
+fn normal(p: vec3<f32>) -> vec3<f32> {
+    let dir = vec2<f32>(0.01, 0.0);
+    
+    return normalize(vec3<f32>(
+         sample_scene(p + dir.xyy).distance - sample_scene(p - dir.xyy).distance,   
+         sample_scene(p + dir.yxy).distance - sample_scene(p - dir.yxy).distance,   
+         sample_scene(p + dir.yyx).distance - sample_scene(p - dir.yyx).distance,   
+    ));
 }
 
 fn follow_ray(start: vec3<f32>, dir: vec3<f32>, iterations: i32) -> RayMarchingResult {
@@ -121,8 +134,11 @@ fn sample_light_rays(start: vec3<f32>) -> RayMarchingResult {
     var result = RayMarchingResult(vec3<f32>(0.0, 0.0, 0.0), false, false);
     for (var i: u32 = 0u; i < arrayLength(&light_spheres.spheres); i = i + 1u) {
         var l = light_spheres.spheres[i];
+
         var direction = normalize(l.center - start);
-        var single_ray_result = follow_ray(start + direction * vec3<f32>(0.01, 0.01, 0.01), direction, 63);
+
+        var single_ray_result =  follow_ray(start + direction * vec3<f32>(0.01, 0.01, 0.01), direction, 63);
+        
         if (single_ray_result.lightHit) {
             result.color = result.color + single_ray_result.color;
         }
@@ -141,11 +157,16 @@ fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32, strength: f32
             var light_hit = sample_light_rays(pos);
             var h = RayMarchingResult(vec3<f32>(0.0, 0.0, 0.0), true, false);
             if (light_hit.lightHit) {
-                h =  RayMarchingResult((hit.color * light_hit.color) * strength, true, true); 
+                h = RayMarchingResult((hit.color * light_hit.color) * strength, true, true); 
             }
             
             if (strength > 0.1) {
-                ver rec = ray_marching(pos, TODO, iterations, strength * h);
+                let ref_dir = reflect(dir, normal(pos));
+                
+                var rec = follow_ray(pos + ref_dir * 0.01, ref_dir, iterations);
+                if (rec.hit) {
+                    h.color = h.color * (1.0 - hit.reflectiviy) + rec.color * hit.reflectiviy;  
+                } 
             }
             return h;
         }
@@ -156,8 +177,8 @@ fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32, strength: f32
     
 }
 
-[[stage(fragment)]]
-fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(in.uv), 64, 1.0).color, 1.0);
+@fragment
+fn fs_main(v: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(v.uv), 64, 1.0).color, 1.0);
 }
 
