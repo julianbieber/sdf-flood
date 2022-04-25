@@ -37,8 +37,8 @@ fn main() {
             },
             color: mint::Vector3 {
                 x: 1.0f32,
-                y: 1.0f32,
-                z: 1.0f32,
+                y: 0.0f32,
+                z: 0.0f32,
             },
             reflectivity: 0.0f32,
         },
@@ -54,7 +54,7 @@ fn main() {
                 y: 1.0f32,
                 z: 1.0f32,
             },
-            reflectivity: 0.0f32,
+            reflectivity: 1.0f32,
         },
         model::Sphere {
             radius: 0.5,
@@ -68,7 +68,7 @@ fn main() {
                 y: 1.0f32,
                 z: 1.0f32,
             },
-            reflectivity: 0.0f32,
+            reflectivity: 1.0f32,
         },
         model::Sphere {
             color: mint::Vector3 {
@@ -124,7 +124,7 @@ fn main() {
                 z: 20.0,
             },
             radius: 50.0,
-            reflectivity: 0.0f32,
+            reflectivity: 0.5f32,
         },
     ];
 
