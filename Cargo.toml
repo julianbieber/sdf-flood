@@ -15,3 +15,4 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "59d640a" }
 pollster = "0.2"
 crevice = {version = "0.8.0"}
 mint = "0.5"
+eframe = "0.17.0"

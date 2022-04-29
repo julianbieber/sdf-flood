@@ -1,7 +1,10 @@
 mod model;
 mod render_pipeline;
-use model::{Sphere, Vertex};
-use wgpu::{util::DeviceExt, BindGroupLayoutDescriptor};
+use eframe::egui;
+use model::{Scene, Sphere, Vertex};
+use wgpu::{
+    util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device,
+};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -18,7 +21,6 @@ fn main() {
         .video_modes()
         .collect();
     video_modes.sort_by_key(|a| a.size().height * a.size().width);
-    dbg!(video_modes.last());
     let window = WindowBuilder::new()
         .with_fullscreen(Some(Fullscreen::Exclusive(
             video_modes.last().unwrap().clone(),
@@ -143,7 +145,11 @@ fn main() {
         reflectivity: 0.0f32,
     }];
 
-    let mut state = pollster::block_on(State::new(&window, &vertices, &spheres, &light_spheres));
+    let mut scene = Scene::new(light_spheres, spheres);
+    let options = eframe::NativeOptions::default();
+    eframe::run_native(Box::new(scene), options);
+
+    let mut state = pollster::block_on(State::new(&window, &vertices, &mut scene));
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
@@ -166,8 +172,8 @@ fn main() {
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
-            state.update();
-            match state.render() {
+            scene.move_last_sphere(0.0, 0.1, 0.0);
+            match state.render(&mut scene) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
@@ -183,6 +189,8 @@ fn main() {
 
 use winit::window::Window;
 
+use crate::model::create_sphere_buffer;
+
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -193,19 +201,14 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertices: Vec<u8>,
+    sphere_buffer: Buffer,
+    light_buffer: Buffer,
     num_vertices: usize,
-    spheres: Vec<u8>,
-    light_spheres: Vec<u8>,
 }
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(
-        window: &Window,
-        vertices: &Vec<Vertex>,
-        spheres: &Vec<Sphere>,
-        light_spheres: &Vec<Sphere>,
-    ) -> Self {
+    async fn new(window: &Window, vertices: &Vec<Vertex>, scene: &mut Scene) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
         let surface = unsafe { instance.create_surface(window) };
@@ -243,7 +246,6 @@ impl State {
             label: Some("shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
-
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -269,43 +271,11 @@ impl State {
                 },
             ],
         });
-
-        let mut spheres_bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
-        sphere_bytes_writer
-            .write_iter(spheres.iter().cloned())
-            .unwrap();
-        let spheres_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("sphere buffer"),
-            contents: &spheres_bytes[..],
-            usage: wgpu::BufferUsages::STORAGE,
-        }); // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
-
-        let mut light_bytes = vec![];
-        let mut light_bytes_writer = crevice::std430::Writer::new(&mut light_bytes);
-        light_bytes_writer
-            .write_iter(light_spheres.iter().cloned())
-            .unwrap();
-        let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("sphere buffer"),
-            contents: &light_bytes[..],
-            usage: wgpu::BufferUsages::STORAGE,
-        }); // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: spheres_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: light_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let (lights, spheres) = scene.get_changed();
+        let light_buffer = create_sphere_buffer(&device, lights.unwrap());
+        let sphere_buffer = create_sphere_buffer(&device, spheres.unwrap());
+        let bind_group =
+            create_bind_group(&device, &bind_group_layout, &light_buffer, &sphere_buffer);
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -329,7 +299,6 @@ impl State {
         vertex_bytes_writer
             .write_iter(vertices.iter().cloned())
             .unwrap();
-        dbg!(vertex_bytes.len());
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
             contents: &vertex_bytes[..],
@@ -346,9 +315,9 @@ impl State {
             vertex_buffer,
             bind_group,
             vertices: vertex_bytes,
-            spheres: spheres_bytes,
+            light_buffer,
+            sphere_buffer,
             num_vertices: vertices.len(),
-            light_spheres: light_bytes,
         }
     }
 
@@ -365,13 +334,36 @@ impl State {
         false
     }
 
-    fn update(&mut self) {}
-
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    fn render(&mut self, scene: &mut Scene) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let (l_o, s_o) = scene.get_changed();
+        l_o.iter().for_each(|l| {
+            let new_buffer = create_sphere_buffer(&self.device, l);
+            self.light_buffer.destroy();
+            self.light_buffer = new_buffer;
+        });
+        s_o.iter().for_each(|s| {
+            let new_buffer = create_sphere_buffer(&self.device, s);
+            self.sphere_buffer.destroy();
+            self.sphere_buffer = new_buffer;
+        });
+        if l_o.is_some() || s_o.is_some() {
+            let layout = self.render_pipeline.get_bind_group_layout(0);
+            self.bind_group = create_bind_group(
+                &self.device,
+                &layout,
+                &self.light_buffer,
+                &self.sphere_buffer,
+            );
+        }
+        // TODO destroy current buffer,
+        // create new buffer
+        // override bind group
+        //
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -400,4 +392,27 @@ impl State {
         output.present();
         Ok(())
     }
+}
+
+fn create_bind_group(
+    device: &Device,
+    layout: &BindGroupLayout,
+    light_buffer: &Buffer,
+    sphere_buffer: &Buffer,
+) -> BindGroup {
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: sphere_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: light_buffer.as_entire_binding(),
+            },
+        ],
+    });
+    bind_group
 }
