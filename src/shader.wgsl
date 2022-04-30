@@ -148,7 +148,7 @@ fn sample_light_rays(start: vec3<f32>) -> RayMarchingResult {
 
         var direction = normalize(l.center - start);
 
-        var single_ray_result =  follow_ray(start + direction * vec3<f32>(0.01, 0.01, 0.01), direction, 63);
+        var single_ray_result =  follow_ray(start + direction * vec3<f32>(0.01, 0.01, 0.01), direction, 8);
         
         if (single_ray_result.lightHit) {
             result.color = result.color + single_ray_result.color;
@@ -190,6 +190,6 @@ fn ray_marching(start: vec3<f32>, dir: vec3<f32>, iterations: i32) -> RayMarchin
 
 @fragment
 fn fs_main(v: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(v.uv), 64).color, 1.0);
+    return vec4<f32>(ray_marching(vec3<f32>(0.0,0.0,0.0), ray_direction(v.uv), 16).color, 1.0);
 }
 

@@ -1,6 +1,6 @@
 mod model;
 mod render_pipeline;
-use eframe::egui;
+
 use model::{Scene, Sphere, Vertex};
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device,
@@ -13,20 +13,6 @@ use winit::{
 
 fn main() {
     env_logger::init();
-    let event_loop = EventLoop::new();
-    let mut video_modes: Vec<_> = event_loop
-        .available_monitors()
-        .next()
-        .unwrap()
-        .video_modes()
-        .collect();
-    video_modes.sort_by_key(|a| a.size().height * a.size().width);
-    let window = WindowBuilder::new()
-        .with_fullscreen(Some(Fullscreen::Exclusive(
-            video_modes.last().unwrap().clone(),
-        )))
-        .build(&event_loop)
-        .unwrap();
 
     let vertices = Vertex::square();
     let spheres = vec![
@@ -145,10 +131,22 @@ fn main() {
         reflectivity: 0.0f32,
     }];
 
-    let mut scene = Scene::new(light_spheres, spheres);
-    let options = eframe::NativeOptions::default();
-    eframe::run_native(Box::new(scene), options);
-
+    // let mut scene = Scene::new(light_spheres, spheres);
+    let mut scene = Scene::birthday();
+    let event_loop = EventLoop::new();
+    let mut video_modes: Vec<_> = event_loop
+        .available_monitors()
+        .next()
+        .unwrap()
+        .video_modes()
+        .collect();
+    video_modes.sort_by_key(|a| a.size().height * a.size().width);
+    let window = WindowBuilder::new()
+        .with_fullscreen(Some(Fullscreen::Exclusive(
+            video_modes.last().unwrap().clone(),
+        )))
+        .build(&event_loop)
+        .unwrap();
     let mut state = pollster::block_on(State::new(&window, &vertices, &mut scene));
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -169,10 +167,24 @@ fn main() {
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 state.resize(**new_inner_size)
             }
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(key),
+                        ..
+                    },
+                ..
+            } => match state {
+                ElementState::Pressed => {}
+                _ => {}
+            },
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
-            scene.move_last_sphere(0.0, 0.1, 0.0);
+            {
+                scene.animate_birthday();
+            }
             match state.render(&mut scene) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
@@ -271,12 +283,14 @@ impl State {
                 },
             ],
         });
-        let (lights, spheres) = scene.get_changed();
-        let light_buffer = create_sphere_buffer(&device, lights.unwrap());
-        let sphere_buffer = create_sphere_buffer(&device, spheres.unwrap());
+        let (light_buffer, sphere_buffer) = {
+            let (lights, spheres) = scene.get_changed();
+            let light_buffer = create_sphere_buffer(&device, lights.unwrap());
+            let sphere_buffer = create_sphere_buffer(&device, spheres.unwrap());
+            (light_buffer, sphere_buffer)
+        };
         let bind_group =
             create_bind_group(&device, &bind_group_layout, &light_buffer, &sphere_buffer);
-
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
@@ -339,19 +353,21 @@ impl State {
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let (l_o, s_o) = scene.get_changed();
-        l_o.iter().for_each(|l| {
-            let new_buffer = create_sphere_buffer(&self.device, l);
-            self.light_buffer.destroy();
-            self.light_buffer = new_buffer;
-        });
-        s_o.iter().for_each(|s| {
-            let new_buffer = create_sphere_buffer(&self.device, s);
-            self.sphere_buffer.destroy();
-            self.sphere_buffer = new_buffer;
-        });
-        if l_o.is_some() || s_o.is_some() {
+        let changed = {
+            let (l_o, s_o) = scene.get_changed();
+            l_o.iter().for_each(|l| {
+                let new_buffer = create_sphere_buffer(&self.device, l);
+                self.light_buffer.destroy();
+                self.light_buffer = new_buffer;
+            });
+            s_o.iter().for_each(|s| {
+                let new_buffer = create_sphere_buffer(&self.device, s);
+                self.sphere_buffer.destroy();
+                self.sphere_buffer = new_buffer;
+            });
+            l_o.is_some() || s_o.is_some()
+        };
+        if changed {
             let layout = self.render_pipeline.get_bind_group_layout(0);
             self.bind_group = create_bind_group(
                 &self.device,
@@ -360,10 +376,6 @@ impl State {
                 &self.sphere_buffer,
             );
         }
-        // TODO destroy current buffer,
-        // create new buffer
-        // override bind group
-        //
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
