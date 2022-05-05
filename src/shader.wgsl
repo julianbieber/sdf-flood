@@ -79,7 +79,8 @@ fn is_hit(h: RayHit) -> bool {
 
 fn sample_spheres(p: vec3<f32>) -> RayHit {
     var hit = init_hit();
-    for (var i: u32 = 0u; i < arrayLength(&spheres.spheres); i = i + 1u) {
+    let l = arrayLength(&spheres.spheres);
+    for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = spheres.spheres[i];
         let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
@@ -94,7 +95,8 @@ fn sample_spheres(p: vec3<f32>) -> RayHit {
 fn sample_lights(p: vec3<f32>) -> RayHit {
     var hit = init_hit();
     hit.light = true;
-    for (var i: u32 = 0u; i < arrayLength(&light_spheres.spheres); i = i + 1u) {
+    let l = arrayLength(&light_spheres.spheres);
+    for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = light_spheres.spheres[i];
         let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
@@ -143,7 +145,8 @@ fn follow_ray(start: vec3<f32>, dir: vec3<f32>, iterations: i32) -> RayMarchingR
 
 fn sample_light_rays(start: vec3<f32>) -> RayMarchingResult {
     var result = init_rmr();
-    for (var i: u32 = 0u; i < arrayLength(&light_spheres.spheres); i = i + 1u) {
+    let l = arrayLength(&light_spheres.spheres);
+    for (var i: u32 = 0u; i < l; i = i + 1u) {
         var l = light_spheres.spheres[i];
 
         var direction = normalize(l.center - start);

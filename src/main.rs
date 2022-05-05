@@ -1,7 +1,11 @@
 mod model;
 mod render_pipeline;
+mod util;
+
+use std::time::Instant;
 
 use model::{Scene, Sphere, Vertex};
+use util::FPS;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device,
 };
@@ -148,6 +152,7 @@ fn main() {
         .build(&event_loop)
         .unwrap();
     let mut state = pollster::block_on(State::new(&window, &vertices, &mut scene));
+    let mut fps = FPS::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
@@ -182,9 +187,9 @@ fn main() {
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
-            {
-                scene.animate_birthday();
-            }
+            fps.presented();
+            dbg!(fps.fps());
+            scene.animate_birthday();
             match state.render(&mut scene) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
