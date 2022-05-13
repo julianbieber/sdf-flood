@@ -8,21 +8,29 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
 };
 
-
-
-struct Sphere {
-    color: vec3<f32>,
+struct SpherePos {
     center: vec3<f32>,
     radius: f32,
+}
+
+
+struct SphereAttribute {
+    color: vec3<f32>,
     reflectivity: f32,
 };
 
-struct Spheres {
-    spheres: array<Sphere>,
+struct SpherePositions {
+    spheres: array<SpherePos>,
 };
 
-@group(0) @binding(0) var<storage,read> spheres: Spheres;
-@group(0) @binding(1) var<storage,read> light_spheres: Spheres;
+struct SphereAttributes {
+    spheres: array<SphereAttribute>,
+}
+
+@group(0) @binding(0) var<storage,read> spheres: SpherePositions;
+@group(0) @binding(1) var<storage,read> light_spheres: SpherePositions;
+@group(0) @binding(0) var<storage,read> sphere_attributes: SphereAttributes;
+@group(0) @binding(1) var<storage,read> light_attributes: SphereAttributes;
 
 @vertex
 fn vs_main(
@@ -45,11 +53,9 @@ fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
     return  normalize(vec3<f32>(((pixel.x - 0.5) * 1.7777) * 1.6, (pixel.y - 0.5) * 1.6, 1.0));
 }
 
-struct RayHit {
+struct Sample {
     distance: f32,
-    color: vec3<f32>,
-    light: bool,
-    reflectiviy: f32,
+    closest_index: u32,
 };
 
 struct RayMarchingResult {
@@ -69,15 +75,15 @@ fn init_rmr() -> RayMarchingResult {
     );
 }
 
-fn init_hit() -> RayHit {
-    return RayHit(100000.0, vec3<f32>(0.0,0.0,0.0), false, 0.0);
+fn init_hit() -> Sample {
+    return Sample(100000.0, 0u);
 }
 
-fn is_hit(h: RayHit) -> bool {
+fn is_hit(h: Sample) -> bool {
     return h.distance < 0.001;
 }
 
-fn sample_spheres(p: vec3<f32>) -> RayHit {
+fn sample_spheres(p: vec3<f32>) -> Sample {
     var hit = init_hit();
     let l = arrayLength(&spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
@@ -85,30 +91,33 @@ fn sample_spheres(p: vec3<f32>) -> RayHit {
         let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
             hit.distance = d;
-            hit.color = sphere.color;
-            hit.reflectiviy = sphere.reflectivity;
+            hit.closest_index = i;
         }
     }
     return hit;
 }
 
-fn sample_lights(p: vec3<f32>) -> RayHit {
+fn sample_lights(p: vec3<f32>) -> Sample {
     var hit = init_hit();
-    hit.light = true;
     let l = arrayLength(&light_spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = light_spheres.spheres[i];
         let d = length(p - sphere.center) - sphere.radius;
         if (d < hit.distance) {
             hit.distance = d;
-            hit.color = sphere.color;
-            hit.reflectiviy = sphere.reflectivity;
+            hit.closest_index = i;
         }
     }
     return hit;
 }
 
-fn sample_scene(p: vec3<f32>) -> RayHit {
+
+struct SceneSample {
+    sample: Sample,
+    light: bool,
+}
+
+fn sample_scene(p: vec3<f32>) -> SampleScene{
     var l = sample_lights(p);
     var s = sample_spheres(p);
     if (l.distance < s.distance) {
