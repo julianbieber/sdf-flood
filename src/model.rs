@@ -76,14 +76,12 @@ impl Vertex {
 }
 
 #[derive(AsStd430, Clone)]
-pub struct Sphere {
-    pub color: mint::Vector3<f32>,
+pub struct SpherePos {
     pub center: mint::Vector3<f32>,
     pub radius: f32,
-    pub reflectivity: f32,
 }
 
-pub fn create_sphere_buffer(device: &Device, spheres: &Vec<Sphere>) -> Buffer {
+pub fn create_sphere_buffer(device: &Device, spheres: &Vec<SpherePos>) -> Buffer {
     let mut spheres_bytes = vec![];
     let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
     sphere_bytes_writer
@@ -94,6 +92,63 @@ pub fn create_sphere_buffer(device: &Device, spheres: &Vec<Sphere>) -> Buffer {
         contents: &spheres_bytes[..],
         usage: wgpu::BufferUsages::STORAGE,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}
+
+#[derive(AsStd430, Clone)]
+pub struct SphereAttribute {
+    pub color: mint::Vector3<f32>,
+    pub reflectivity: f32,
+}
+
+pub fn create_sphere_attribute_buffer(device: &Device, spheres: &Vec<SphereAttribute>) -> Buffer {
+    let mut spheres_bytes = vec![];
+    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
+    sphere_bytes_writer
+        .write_iter(spheres.iter().cloned())
+        .unwrap();
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("sphere buffer"),
+        contents: &spheres_bytes[..],
+        usage: wgpu::BufferUsages::STORAGE,
+    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}
+
+pub struct Sphere {
+    pub center: mint::Vector3<f32>,
+    pub radius: f32,
+    pub color: mint::Vector3<f32>,
+    pub reflectivity: f32,
+}
+
+impl Sphere {
+    pub fn split_to_buffers(&self) -> (SpherePos, SphereAttribute) {
+        let pos = SpherePos {
+            center: self.center.clone(),
+            radius: self.radius,
+        };
+        let att = SphereAttribute {
+            color: self.color.clone(),
+            reflectivity: self.reflectivity,
+        };
+        (pos, att)
+    }
+}
+
+pub trait Spheres {
+    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>);
+}
+
+impl Spheres for Vec<Sphere> {
+    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>) {
+        let mut poss = Vec::with_capacity(self.len());
+        let mut atts = Vec::with_capacity(self.len());
+        for s in self.iter() {
+            let (pos, att) = s.split_to_buffers();
+            poss.push(pos);
+            atts.push(att);
+        }
+        (poss, atts)
+    }
 }
 
 pub struct Scene {
