@@ -89,9 +89,9 @@ fn is_hit(h: SceneSample) -> bool {
 }
 
 
-fn smoothUnion(d1: f32, d2: f32) -> f32 {
-    let h = clamp(0.5 + 0.5 * (d2 - d1) / 1.0, 0.0, 1.0);
-    return mix(d2, d1, h) - 1.0 * h * (1.0 -h);
+fn smoothUnion(d1: f32, d2: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+    return mix(d2, d1, h) - k * h * (1.0 - h);
 }
 
 fn sample_spheres(p: vec3<f32>) -> Sample {
@@ -99,7 +99,7 @@ fn sample_spheres(p: vec3<f32>) -> Sample {
     let l = arrayLength(&spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = spheres.spheres[i];
-        let d = smoothUnion(sampl.distance, length(p - sphere.center) - sphere.radius);
+        let d = smoothUnion(sampl.distance, length(p - sphere.center) - sphere.radius, 2.0);
         if (d < sampl.distance) {
             sampl.distance = d;
             sampl.closest_index = i;

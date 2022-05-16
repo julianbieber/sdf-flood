@@ -25,6 +25,6 @@ impl FPS {
 
     pub fn fps(&self) -> f32 {
         let time = self.buffer.iter().clone().sum::<u64>() as f32;
-        time / 32000.0
+        32000.0 / time
     }
 }
