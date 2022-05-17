@@ -94,7 +94,12 @@ fn smoothUnion(d1: f32, d2: f32, k: f32) -> f32 {
     return mix(d2, d1, h) - k * h * (1.0 - h);
 }
 
-fn sample_spheres(p: vec3<f32>) -> Sample {
+fn modu(x: vec3<f32>, y: f32) -> vec3<f32> {
+    return x - floor(x/y) * y;
+}
+
+fn sample_spheres(p_orig: vec3<f32>) -> Sample {
+    let p = modu(p_orig + 0.5*20.0, 20.0) - 0.5*20.0;
     var sampl = init_hit();
     let l = arrayLength(&spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
