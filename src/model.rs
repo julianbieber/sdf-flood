@@ -1,4 +1,5 @@
 use crevice::std430::AsStd430;
+use nanorand::{Rng, WyRand};
 use wgpu::{util::DeviceExt, Buffer, Device};
 
 #[derive(AsStd430, Clone)]
@@ -75,14 +76,12 @@ impl Vertex {
 }
 
 #[derive(AsStd430, Clone)]
-pub struct Sphere {
-    pub color: mint::Vector3<f32>,
+pub struct SpherePos {
     pub center: mint::Vector3<f32>,
     pub radius: f32,
-    pub reflectivity: f32,
 }
 
-pub fn create_sphere_buffer(device: &Device, spheres: &Vec<Sphere>) -> Buffer {
+pub fn create_sphere_buffer(device: &Device, spheres: &Vec<SpherePos>) -> Buffer {
     let mut spheres_bytes = vec![];
     let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
     sphere_bytes_writer
@@ -93,6 +92,63 @@ pub fn create_sphere_buffer(device: &Device, spheres: &Vec<Sphere>) -> Buffer {
         contents: &spheres_bytes[..],
         usage: wgpu::BufferUsages::STORAGE,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}
+
+#[derive(AsStd430, Clone)]
+pub struct SphereAttribute {
+    pub color: mint::Vector3<f32>,
+    pub reflectivity: f32,
+}
+
+pub fn create_sphere_attribute_buffer(device: &Device, spheres: &Vec<SphereAttribute>) -> Buffer {
+    let mut spheres_bytes = vec![];
+    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
+    sphere_bytes_writer
+        .write_iter(spheres.iter().cloned())
+        .unwrap();
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("sphere buffer"),
+        contents: &spheres_bytes[..],
+        usage: wgpu::BufferUsages::STORAGE,
+    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}
+
+pub struct Sphere {
+    pub center: mint::Vector3<f32>,
+    pub radius: f32,
+    pub color: mint::Vector3<f32>,
+    pub reflectivity: f32,
+}
+
+impl Sphere {
+    pub fn split_to_buffers(&self) -> (SpherePos, SphereAttribute) {
+        let pos = SpherePos {
+            center: self.center.clone(),
+            radius: self.radius,
+        };
+        let att = SphereAttribute {
+            color: self.color.clone(),
+            reflectivity: self.reflectivity,
+        };
+        (pos, att)
+    }
+}
+
+pub trait Spheres {
+    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>);
+}
+
+impl Spheres for Vec<Sphere> {
+    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>) {
+        let mut poss = Vec::with_capacity(self.len());
+        let mut atts = Vec::with_capacity(self.len());
+        for s in self.iter() {
+            let (pos, att) = s.split_to_buffers();
+            poss.push(pos);
+            atts.push(att);
+        }
+        (poss, atts)
+    }
 }
 
 pub struct Scene {
@@ -109,6 +165,68 @@ impl Scene {
             lights_chanegd: false,
             spheres: vec![],
             spheres_changed: false,
+        }
+    }
+
+    pub fn birthday() -> Scene {
+        let mut s = Scene {
+            lights: vec![Sphere {
+                color: mint::Vector3 {
+                    x: 1.0f32,
+                    y: 1.0f32,
+                    z: 1.0f32,
+                },
+                center: mint::Vector3 {
+                    x: 0.0f32,
+                    y: 0.0f32,
+                    z: -10.0f32,
+                },
+                radius: 0.1,
+                reflectivity: 0.0,
+            }],
+            lights_chanegd: true,
+            spheres: vec![],
+            spheres_changed: true,
+        };
+
+        let mut rng = WyRand::new();
+        for i in 0..20 {
+            s.add_sphere();
+            let offset = rng.generate_range(1_u64..=100_u64);
+            s.move_last_sphere(
+                0.0,
+                -5.0 + (offset as f32) / 100.0 * 3.0 - (2.0 * (i as f32) / 5.0),
+                5.0,
+            );
+            let p = s.spheres.last_mut().unwrap();
+            let red = rng.generate_range(0_u64..100_u64);
+            p.color.x = red as f32 / 100.0;
+            let g = rng.generate_range(0_u64..100_u64);
+            p.color.y = g as f32 / 100.0;
+            let b = rng.generate_range(0_u64..100_u64);
+            p.color.z = b as f32 / 100.0;
+        }
+
+        s
+    }
+
+    pub fn animate_birthday(&mut self) {
+        self.spheres_changed = true;
+        let mut rng = WyRand::new();
+
+        for (i, s) in self.spheres.iter_mut().enumerate() {
+            s.center.y += 0.1;
+            if i == 0 {
+            } else if i % 2 == 0 {
+                s.center.x -= (s.center.y / 5.0 - 1.0).exp() * 0.2;
+            } else {
+                s.center.x += (s.center.y / 5.0 - 1.0).exp() * 0.2;
+            }
+            if s.center.y > 5.0 {
+                s.center.x = 0.0;
+                let offset = rng.generate_range(1_u64..=100_u64);
+                s.center.y = -5.0 + (offset as f32) / 100.0 * 2.0;
+            }
         }
     }
 
@@ -178,7 +296,7 @@ impl Scene {
                 z: 0.0f32,
             },
             radius: 1.0,
-            reflectivity: 0.0,
+            reflectivity: 1.0,
         });
         self.spheres_changed = true;
     }
@@ -192,16 +310,5 @@ impl Scene {
             };
             self.spheres_changed = true;
         });
-    }
-}
-
-use eframe::egui;
-impl eframe::epi::App for Scene {
-    fn update(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
-        todo!()
-    }
-
-    fn name(&self) -> &str {
-        ""
     }
 }
