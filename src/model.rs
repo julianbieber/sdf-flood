@@ -121,33 +121,22 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn split_to_buffers(&self) -> (SpherePos, SphereAttribute) {
+    pub fn split_to_buffers(&self) -> SpherePos {
         let pos = SpherePos {
             center: self.center.clone(),
             radius: self.radius,
         };
-        let att = SphereAttribute {
-            color: self.color.clone(),
-            reflectivity: self.reflectivity,
-        };
-        (pos, att)
+        pos
     }
 }
 
 pub trait Spheres {
-    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>);
+    fn split_to_buffers(&self) -> Vec<SpherePos>;
 }
 
 impl Spheres for Vec<Sphere> {
-    fn split_to_buffers(&self) -> (Vec<SpherePos>, Vec<SphereAttribute>) {
-        let mut poss = Vec::with_capacity(self.len());
-        let mut atts = Vec::with_capacity(self.len());
-        for s in self.iter() {
-            let (pos, att) = s.split_to_buffers();
-            poss.push(pos);
-            atts.push(att);
-        }
-        (poss, atts)
+    fn split_to_buffers(&self) -> Vec<SpherePos> {
+        self.iter().map(|v| v.split_to_buffers()).collect()
     }
 }
 

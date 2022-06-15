@@ -28,9 +28,7 @@ struct SphereAttributes {
 }
 
 @group(0) @binding(0) var<storage,read> spheres: SpherePositions;
-@group(0) @binding(1) var<storage,read> sphere_attributes: SphereAttributes;
-@group(0) @binding(2) var<storage,read> light_spheres: SpherePositions;
-@group(0) @binding(3) var<storage,read> light_attributes: SphereAttributes;
+@group(0) @binding(1) var<storage,read> light_spheres: SpherePositions;
 
 @vertex
 fn vs_main(
@@ -88,6 +86,45 @@ fn is_hit(h: SceneSample) -> bool {
     return h.sampl.distance < 0.01;
 }
 
+fn hash(p: vec3<f32>) -> f32 {
+    let p2  = 50.0*fract( p*0.3183099 + vec3(0.71,0.113,0.419));
+    return -1.0+2.0*fract( p2.x*p2.y*p2.z*(p2.x+p2.y+p2.z) );
+}
+
+fn noise(x: vec3<f32>) -> f32 {
+    let p = floor(x);
+    let w = fract(x);
+    let u = w * w * w *(w * (w*6.0 - 15.0)+10.0);
+    let du = 30.0 * w * w *(w * (w - 2.0) + 1.0);
+    
+    let a = hash(p + vec3<f32>(0.0, 0.0, 0.0));
+    let b = hash(p + vec3<f32>(1.0, 0.0, 0.0));
+    let c = hash(p + vec3<f32>(0.0, 1.0, 0.0));
+    let d = hash(p + vec3<f32>(1.0, 1.0, 0.0));
+    let e = hash(p + vec3<f32>(0.0, 0.0, 1.0));
+    let f = hash(p + vec3<f32>(1.0, 0.0, 1.0));
+    let g = hash(p + vec3<f32>(0.0, 1.0, 1.0));
+    let h = hash(p + vec3<f32>(1.0, 1.0, 1.0));
+    let k0 =   a;
+    let k1 =   b - a;
+    let k2 =   c - a;
+    let k3 =   e - a;
+    let k4 =   a - b - c + d;
+    let k5 =   a - c - e + g;
+    let k6 =   a - b - e + f;
+    let k7 = - a + b + c - d + e - f - g + h;
+    return k0 + k1*u.x + k2*u.y + k3*u.z + k4*u.x*u.y + k5*u.y*u.z + k6*u.z*u.x + k7*u.x*u.y*u.z;
+}
+
+fn fbm(p: vec3<f32>, h: f32) -> f32 {
+    var t = 0.0;
+    for (var i = 0.0; i < 4.0; i = i + 1.0) {
+        let f = pow(2.0, i);
+        let a = pow(f, -h);
+        t = t + a;// * noise(f * p);
+    }
+    return t;
+}
 
 fn smoothUnion(d1: f32, d2: f32, k: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
@@ -96,6 +133,10 @@ fn smoothUnion(d1: f32, d2: f32, k: f32) -> f32 {
 
 fn modu(x: vec3<f32>, y: f32) -> vec3<f32> {
     return x - floor(x/y) * y;
+}
+
+fn water(p: vec3<f32>) -> f32 {
+    return p.y
 }
 
 fn sample_spheres(p_orig: vec3<f32>) -> Sample {
@@ -110,6 +151,7 @@ fn sample_spheres(p_orig: vec3<f32>) -> Sample {
             sampl.closest_index = i;
         }
     }
+    let water_dist = smoothUnion(water(p_orig), sampl.distance);
     return sampl;
 }
 
