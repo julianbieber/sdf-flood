@@ -23,10 +23,6 @@ struct SpherePositions {
     spheres: array<SpherePos>,
 };
 
-struct SphereAttributes {
-    spheres: array<SphereAttribute>,
-}
-
 @group(0) @binding(0) var<storage,read> spheres: SpherePositions;
 @group(0) @binding(1) var<storage,read> light_spheres: SpherePositions;
 
@@ -51,13 +47,8 @@ fn ray_direction(pixel: vec2<f32>) -> vec3<f32> {
     return  normalize(vec3<f32>(((pixel.x - 0.5) * 1.7777) * 1.6, (pixel.y - 0.5) * 1.6, 1.0));
 }
 
-struct Sample {
-    distance: f32,
-    closest_index: u32,
-};
-
 struct SceneSample {
-    sampl: Sample,
+    sampl: f32,
     light: bool,
 }
 
@@ -78,12 +69,8 @@ fn init_rmr() -> RayMarchingResult {
     );
 }
 
-fn init_hit() -> Sample {
-    return Sample(100000.0, 0u);
-}
-
 fn is_hit(h: SceneSample) -> bool {
-    return h.sampl.distance < 0.01;
+    return h.sampl < 0.01;
 }
 
 fn hash(p: vec3<f32>) -> f32 {
@@ -126,6 +113,14 @@ fn fbm(p: vec3<f32>, h: f32) -> f32 {
     return t;
 }
 
+fn material(p: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(0.0, (p.y + 20.0) / 60.00, 0.0);
+}
+
+fn calc_reflectivity(p: vec3<f32>) -> f32 {
+    return 0.5;
+}
+
 fn smoothUnion(d1: f32, d2: f32, k: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
     return mix(d2, d1, h) - k * h * (1.0 - h);
@@ -136,35 +131,32 @@ fn modu(x: vec3<f32>, y: f32) -> vec3<f32> {
 }
 
 fn water(p: vec3<f32>) -> f32 {
-    return p.y
+    return p.y + 21.0;
 }
 
-fn sample_spheres(p_orig: vec3<f32>) -> Sample {
-    let p = modu(p_orig + 0.5*20.0, 20.0) - 0.5*20.0;
-    var sampl = init_hit();
+
+
+fn sample_spheres(p_orig: vec3<f32>) -> f32 {
+    let p = p_orig;// modu(p_orig + 0.5*20.0, 20.0) - 0.5*20.0;
+    var sampl = 1000000.0;
     let l = arrayLength(&spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = spheres.spheres[i];
-        let d = smoothUnion(sampl.distance, length(p - sphere.center) - sphere.radius, 2.0);
-        if (d < sampl.distance) {
-            sampl.distance = d;
-            sampl.closest_index = i;
-        }
+        let d = smoothUnion(sampl, length(p - sphere.center) - sphere.radius, 2.0);
+        sampl = min(sampl, d);
     }
-    let water_dist = smoothUnion(water(p_orig), sampl.distance);
+    let water_dist = smoothUnion(water(p_orig), sampl, 3.0);
+    sampl = min(sampl, water_dist);
     return sampl;
 }
 
-fn sample_lights(p: vec3<f32>) -> Sample {
-    var sampl = init_hit();
+fn sample_lights(p: vec3<f32>) -> f32 {
+    var sampl = 10000.0;
     let l = arrayLength(&light_spheres.spheres);
     for (var i: u32 = 0u; i < l; i = i + 1u) {
         let sphere = light_spheres.spheres[i];
         let d = length(p - sphere.center) - sphere.radius;
-        if (d < sampl.distance) {
-            sampl.distance = d;
-            sampl.closest_index = i;
-        }
+        sampl = min(sampl, d);
     }
     return sampl;
 }
@@ -172,7 +164,7 @@ fn sample_lights(p: vec3<f32>) -> Sample {
 fn sample_scene(p: vec3<f32>) -> SceneSample {
     var l = sample_lights(p);
     var s = sample_spheres(p);
-    if (l.distance < s.distance) {
+    if (l < s) {
         return SceneSample(l, true);
     } else {
         return SceneSample(s, false);
@@ -183,9 +175,9 @@ fn normal(p: vec3<f32>) -> vec3<f32> {
     let dir = vec2<f32>(0.01, 0.0);
 
     return normalize(vec3<f32>(
-        sample_scene(p + dir.xyy).sampl.distance - sample_scene(p - dir.xyy).sampl.distance,
-        sample_scene(p + dir.yxy).sampl.distance - sample_scene(p - dir.yxy).sampl.distance,
-        sample_scene(p + dir.yyx).sampl.distance - sample_scene(p - dir.yyx).sampl.distance,
+        sample_spheres(p + dir.xyy) - sample_spheres(p - dir.xyy),
+        sample_spheres(p + dir.yxy) - sample_spheres(p - dir.yxy),
+        sample_spheres(p + dir.yyx) - sample_spheres(p - dir.yyx),
     ));
 }
 
@@ -194,15 +186,15 @@ fn follow_ray(start: vec3<f32>, dir: vec3<f32>, iterations: i32) -> RayMarchingR
     for (var i:i32 = 0; i < iterations; i = i + 1) {
         let hit = sample_scene(p);
         if (is_hit(hit)) {
+            let base_coror = material(p);
+            let reflectivity = calc_reflectivity(p);
             if (hit.light) {
-                let att = light_attributes.spheres[hit.sampl.closest_index];
-                return RayMarchingResult(p, att.color, true, true, att.reflectivity);
+                return RayMarchingResult(p, base_coror, true, true, reflectivity);
             } else {
-                let att = sphere_attributes.spheres[hit.sampl.closest_index];
-                return RayMarchingResult(p, att.color, true, false, att.reflectivity);
+                return RayMarchingResult(p, base_coror, true, false, reflectivity);
             }
         }
-        p = p + (dir * hit.sampl.distance);
+        p = p + (dir * hit.sampl);
     }
 
     return RayMarchingResult(p, vec3<f32>(0.0, 0.0, 0.0), false, false, 0.0);
