@@ -23,9 +23,6 @@ struct SpherePositions {
     spheres: array<SpherePos>,
 };
 
-@group(0) @binding(0) var<storage,read> spheres: SpherePositions;
-@group(0) @binding(1) var<storage,read> light_spheres: SpherePositions;
-
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -35,6 +32,14 @@ fn vs_main(
     o.clip_position = vec4<f32>(model.position, 1.0);
     return o;
 }
+
+
+struct FragmentParameters {
+    time: f32,
+}
+
+@group(0) @binding(0) var<uniform> parameter: FragmentParameters; 
+
 
 let fov = 75.0;
 let pi = 3.14159265359;
@@ -139,12 +144,6 @@ fn water(p: vec3<f32>) -> f32 {
 fn sample_spheres(p_orig: vec3<f32>) -> f32 {
     let p = p_orig;// modu(p_orig + 0.5*20.0, 20.0) - 0.5*20.0;
     var sampl = 1000000.0;
-    let l = arrayLength(&spheres.spheres);
-    for (var i: u32 = 0u; i < l; i = i + 1u) {
-        let sphere = spheres.spheres[i];
-        let d = smoothUnion(sampl, length(p - sphere.center) - sphere.radius, 2.0);
-        sampl = min(sampl, d);
-    }
     let water_dist = smoothUnion(water(p_orig), sampl, 3.0);
     sampl = min(sampl, water_dist);
     return sampl;
@@ -152,12 +151,6 @@ fn sample_spheres(p_orig: vec3<f32>) -> f32 {
 
 fn sample_lights(p: vec3<f32>) -> f32 {
     var sampl = 10000.0;
-    let l = arrayLength(&light_spheres.spheres);
-    for (var i: u32 = 0u; i < l; i = i + 1u) {
-        let sphere = light_spheres.spheres[i];
-        let d = length(p - sphere.center) - sphere.radius;
-        sampl = min(sampl, d);
-    }
     return sampl;
 }
 
@@ -202,20 +195,12 @@ fn follow_ray(start: vec3<f32>, dir: vec3<f32>, iterations: i32) -> RayMarchingR
 
 fn sample_light_rays(start: vec3<f32>) -> RayMarchingResult {
     var result = init_rmr();
-    let l = arrayLength(&light_spheres.spheres);
-    for (var i: u32 = 0u; i < l; i = i + 1u) {
-        var l = light_spheres.spheres[i];
 
-        var direction = normalize(l.center - start);
-
-        var single_ray_result = follow_ray(start + direction * 0.01, direction, 8);
-
-        if (single_ray_result.lightHit) {
-            result.color = result.color + single_ray_result.color;
-            result.position = single_ray_result.position;
-        }
-        result.lightHit = result.lightHit || single_ray_result.lightHit;
-    }
+        // if (single_ray_result.lightHit) {
+            // result.color = result.color + single_ray_result.color;
+            // result.position = single_ray_result.position;
+        // }
+        // result.lightHit = result.lightHit || single_ray_result.lightHit;
     result.color = min(result.color, vec3<f32>(1.0, 1.0, 1.0));
     return result;
 }

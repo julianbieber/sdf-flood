@@ -1,6 +1,7 @@
-use crevice::std430::AsStd430;
-use nanorand::{Rng, WyRand};
-use wgpu::{util::DeviceExt, Buffer, Device};
+use std::time::Instant;
+
+use crevice::std430::{AsStd430, Std430};
+use mint::{ColumnMatrix4, Quaternion, Vector3};
 
 #[derive(AsStd430, Clone)]
 pub struct Vertex {
@@ -75,229 +76,50 @@ impl Vertex {
     }
 }
 
-#[derive(AsStd430, Clone)]
-pub struct SpherePos {
-    pub center: mint::Vector3<f32>,
-    pub radius: f32,
-}
-
-pub fn create_sphere_buffer(device: &Device, spheres: &Vec<SpherePos>) -> Buffer {
-    let mut spheres_bytes = vec![];
-    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
-    sphere_bytes_writer
-        .write_iter(spheres.iter().cloned())
-        .unwrap();
-    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("sphere buffer"),
-        contents: &spheres_bytes[..],
-        usage: wgpu::BufferUsages::STORAGE,
-    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
-}
-
-#[derive(AsStd430, Clone)]
-pub struct SphereAttribute {
-    pub color: mint::Vector3<f32>,
-    pub reflectivity: f32,
-}
-
-pub fn create_sphere_attribute_buffer(device: &Device, spheres: &Vec<SphereAttribute>) -> Buffer {
-    let mut spheres_bytes = vec![];
-    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut spheres_bytes);
-    sphere_bytes_writer
-        .write_iter(spheres.iter().cloned())
-        .unwrap();
-    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("sphere buffer"),
-        contents: &spheres_bytes[..],
-        usage: wgpu::BufferUsages::STORAGE,
-    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
-}
-
-pub struct Sphere {
-    pub center: mint::Vector3<f32>,
-    pub radius: f32,
-    pub color: mint::Vector3<f32>,
-    pub reflectivity: f32,
-}
-
-impl Sphere {
-    pub fn split_to_buffers(&self) -> SpherePos {
-        let pos = SpherePos {
-            center: self.center.clone(),
-            radius: self.radius,
-        };
-        pos
-    }
-}
-
-pub trait Spheres {
-    fn split_to_buffers(&self) -> Vec<SpherePos>;
-}
-
-impl Spheres for Vec<Sphere> {
-    fn split_to_buffers(&self) -> Vec<SpherePos> {
-        self.iter().map(|v| v.split_to_buffers()).collect()
-    }
+#[derive(AsStd430)]
+pub struct UniformBuffer {
+    time: f32,
+    camera: mint::ColumnMatrix4<f32>,
 }
 
 pub struct Scene {
-    lights: Vec<Sphere>,
-    lights_chanegd: bool,
-    spheres: Vec<Sphere>,
-    spheres_changed: bool,
+    start: Instant,
+    time: f32,
+    previous: f32,
+    camera_pos: mint::Vector3<f32>,
+    camera_angle: mint::Quaternion<f32>,
+}
+impl Scene {
+    pub fn new() -> Scene {
+        Scene {
+            start: Instant::now(),
+            time: 0.0,
+            previous: 0.0,
+            camera_pos: [0.0f32, 0.0f32, 0.0f32].into(),
+            camera_angle: [0.0f32, 0.0f32, 0.0f32, 1.0].into(),
+        }
+    }
+
+    pub fn update(&mut self) {
+        self.previous = self.time;
+        self.time = self.start.elapsed().as_secs_f32();
+        let elapsed = self.time - self.previous;
+    }
+
+    pub fn buffer(&self) -> UniformBuffer {
+        UniformBuffer {
+            time: self.time,
+            camera: to_matrix(&self.camera_angle, &self.camera_pos),
+        }
+    }
 }
 
-impl Scene {
-    pub fn empty() -> Scene {
-        Scene {
-            lights: vec![],
-            lights_chanegd: false,
-            spheres: vec![],
-            spheres_changed: false,
-        }
-    }
-
-    pub fn birthday() -> Scene {
-        let mut s = Scene {
-            lights: vec![Sphere {
-                color: mint::Vector3 {
-                    x: 1.0f32,
-                    y: 1.0f32,
-                    z: 1.0f32,
-                },
-                center: mint::Vector3 {
-                    x: 0.0f32,
-                    y: 0.0f32,
-                    z: -10.0f32,
-                },
-                radius: 0.1,
-                reflectivity: 0.0,
-            }],
-            lights_chanegd: true,
-            spheres: vec![],
-            spheres_changed: true,
-        };
-
-        let mut rng = WyRand::new();
-        for i in 0..20 {
-            s.add_sphere();
-            let offset = rng.generate_range(1_u64..=100_u64);
-            s.move_last_sphere(
-                0.0,
-                -5.0 + (offset as f32) / 100.0 * 3.0 - (2.0 * (i as f32) / 5.0),
-                5.0,
-            );
-            let p = s.spheres.last_mut().unwrap();
-            let red = rng.generate_range(0_u64..100_u64);
-            p.color.x = red as f32 / 100.0;
-            let g = rng.generate_range(0_u64..100_u64);
-            p.color.y = g as f32 / 100.0;
-            let b = rng.generate_range(0_u64..100_u64);
-            p.color.z = b as f32 / 100.0;
-        }
-
-        s
-    }
-
-    pub fn animate_birthday(&mut self) {
-        self.spheres_changed = true;
-        let mut rng = WyRand::new();
-
-        for (i, s) in self.spheres.iter_mut().enumerate() {
-            s.center.y += 0.1;
-            if i == 0 {
-            } else if i % 2 == 0 {
-                s.center.x -= (s.center.y / 5.0 - 1.0).exp() * 0.2;
-            } else {
-                s.center.x += (s.center.y / 5.0 - 1.0).exp() * 0.2;
-            }
-            if s.center.y > 5.0 {
-                s.center.x = 0.0;
-                let offset = rng.generate_range(1_u64..=100_u64);
-                s.center.y = -5.0 + (offset as f32) / 100.0 * 2.0;
-            }
-        }
-    }
-
-    pub fn new(lights: Vec<Sphere>, spheres: Vec<Sphere>) -> Scene {
-        Scene {
-            lights,
-            spheres,
-            lights_chanegd: true,
-            spheres_changed: true,
-        }
-    }
-
-    pub fn get_changed(&mut self) -> (Option<&Vec<Sphere>>, Option<&Vec<Sphere>>) {
-        let l = if self.lights_chanegd {
-            Some(&self.lights)
-        } else {
-            None
-        };
-
-        let s = if self.spheres_changed {
-            Some(&self.spheres)
-        } else {
-            None
-        };
-        (l, s)
-    }
-
-    pub fn add_light(&mut self) {
-        self.lights.push(Sphere {
-            color: mint::Vector3 {
-                x: 1.0f32,
-                y: 0.0f32,
-                z: 0.0f32,
-            },
-            center: mint::Vector3 {
-                x: 0.0f32,
-                y: 0.0f32,
-                z: 0.0f32,
-            },
-            radius: 1.0,
-            reflectivity: 0.0,
-        });
-        self.lights_chanegd = true;
-    }
-
-    pub fn move_last_light(&mut self, x: f32, y: f32, z: f32) {
-        self.lights.last_mut().iter_mut().for_each(|l| {
-            l.center = mint::Vector3 {
-                x: l.center.x + x,
-                y: l.center.y + y,
-                z: l.center.z + z,
-            };
-            self.lights_chanegd = true;
-        });
-    }
-
-    pub fn add_sphere(&mut self) {
-        self.spheres.push(Sphere {
-            color: mint::Vector3 {
-                x: 1.0f32,
-                y: 0.0f32,
-                z: 0.0f32,
-            },
-            center: mint::Vector3 {
-                x: 0.0f32,
-                y: 0.0f32,
-                z: 0.0f32,
-            },
-            radius: 1.0,
-            reflectivity: 1.0,
-        });
-        self.spheres_changed = true;
-    }
-
-    pub fn move_last_sphere(&mut self, x: f32, y: f32, z: f32) {
-        self.spheres.last_mut().iter_mut().for_each(|l| {
-            l.center = mint::Vector3 {
-                x: l.center.x + x,
-                y: l.center.y + y,
-                z: l.center.z + z,
-            };
-            self.spheres_changed = true;
-        });
-    }
+#[rustfmt::skip]
+fn to_matrix(q: &Quaternion<f32>, translation: &Vector3<f32>) -> ColumnMatrix4<f32> {
+    [
+        2.0f32 * (q.v.x * q.v.x + q.v.y * q.v.y) - 1.0f32, 2.0f32 * (q.v.y * q.v.z - q.v.x*q.s), 2.0f32 * (q.v.y * q.s + q.v.x*q.v.z), translation.x,
+        2.0f32 * (q.v.y * q.v.z + q.v.y * q.s), 2.0f32 * (q.v.x * q.v.x - q.v.z * q.v.z) - 1.0f32, 2.0f32 * (q.v.z * q.s - q.v.x * q.v.y), translation.y,
+        2.0f32 * (q.v.y * q.s - q.v.x * q.v.z), 2.0f32 * (q.v.z * q.s + q.v.x * q.v.y), 2.0f32 * (q.v.x * q.v.x + q.s * q.s) -1.0f32, translation.z,
+        0.0f32, 0.0f32, 0.0f32, 1.0f32,
+    ].into()
 }
