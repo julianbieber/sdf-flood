@@ -44,7 +44,7 @@ fn main() {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == window.id() && !state.input(event) => match event {
+        } if window_id == window.id() => match event {
             WindowEvent::CloseRequested
             | WindowEvent::KeyboardInput {
                 input:
@@ -102,7 +102,6 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    vertices: Vec<u8>,
     num_vertices: usize,
     uniform_buffer: Buffer,
 }
@@ -206,7 +205,6 @@ impl State {
             render_pipeline,
             vertex_buffer,
             bind_group,
-            vertices: vertex_bytes,
             num_vertices: vertices.len(),
             uniform_buffer,
         }
@@ -219,10 +217,6 @@ impl State {
             self.config.height = self.size.height;
             self.surface.configure(&self.device, &self.config);
         }
-    }
-
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        false
     }
 
     fn render(&mut self, uniform: &UniformBuffer) -> Result<(), wgpu::SurfaceError> {

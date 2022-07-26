@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crevice::std430::{AsStd430, Std430};
-use mint::{ColumnMatrix4, Quaternion, Vector3};
+use mint::{ColumnMatrix4, Quaternion, Vector2, Vector3};
 
 #[derive(AsStd430, Clone)]
 pub struct Vertex {
@@ -87,7 +87,7 @@ pub struct Scene {
     time: f32,
     previous: f32,
     camera_pos: mint::Vector3<f32>,
-    camera_angle: mint::Quaternion<f32>,
+    camera_angle: mint::Vector2<f32>,
 }
 impl Scene {
     pub fn new() -> Scene {
@@ -96,7 +96,7 @@ impl Scene {
             time: 0.0,
             previous: 0.0,
             camera_pos: [0.0f32, 0.0f32, 0.0f32].into(),
-            camera_angle: [0.0f32, 0.0f32, 0.0f32, 1.0].into(),
+            camera_angle: [0.0f32, 0.0f32].into(),
         }
     }
 
@@ -115,11 +115,12 @@ impl Scene {
 }
 
 #[rustfmt::skip]
-fn to_matrix(q: &Quaternion<f32>, translation: &Vector3<f32>) -> ColumnMatrix4<f32> {
+fn to_matrix(q: &Vector2<f32>, translation: &Vector3<f32>) -> ColumnMatrix4<f32> {
     [
-        2.0f32 * (q.v.x * q.v.x + q.v.y * q.v.y) - 1.0f32, 2.0f32 * (q.v.y * q.v.z - q.v.x*q.s), 2.0f32 * (q.v.y * q.s + q.v.x*q.v.z), translation.x,
-        2.0f32 * (q.v.y * q.v.z + q.v.y * q.s), 2.0f32 * (q.v.x * q.v.x - q.v.z * q.v.z) - 1.0f32, 2.0f32 * (q.v.z * q.s - q.v.x * q.v.y), translation.y,
-        2.0f32 * (q.v.y * q.s - q.v.x * q.v.z), 2.0f32 * (q.v.z * q.s + q.v.x * q.v.y), 2.0f32 * (q.v.x * q.v.x + q.s * q.s) -1.0f32, translation.z,
-        0.0f32, 0.0f32, 0.0f32, 1.0f32,
+        q.x.cos(), q.x.sin() * q.y.sin(), q.x.sin() * q.y.cos(), translation.x,
+        0.0, q.y.cos(), q.y.sin(), translation.y,
+        -1.0 * q.x.sin(), q.x.cos() * q.y.sin(), q.x.cos() * q.y.cos(), translation.y,
+        0.0, 0.0, 0.0, 1.0,
+        
     ].into()
 }
