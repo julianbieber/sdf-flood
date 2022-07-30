@@ -4,7 +4,7 @@ mod util;
 
 use std::time::Instant;
 
-use crevice::std430::{AsStd430, Std430};
+use encase::StorageBuffer;
 use model::{Scene, UniformBuffer, Vertex};
 use util::FPS;
 use wgpu::{
@@ -160,10 +160,10 @@ impl State {
             }],
         });
 
-        let std_430_uniform = uniform.as_std430();
+        let std_430_uniform = uniform.to_buffer();
         let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
-            contents: std_430_uniform.as_bytes(),
+            contents: &std_430_uniform.into_inner(),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
@@ -185,11 +185,9 @@ impl State {
                 }],
                 &[Vertex::desc()],
             ));
-        let mut vertex_bytes = vec![];
-        let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
-        vertex_bytes_writer
-            .write_iter(vertices.iter().cloned())
-            .unwrap();
+        let mut vertex_bytes_writer = StorageBuffer::new(Vec::new());
+        vertex_bytes_writer.write(vertices).unwrap();
+        let vertex_bytes = vertex_bytes_writer.into_inner();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
             contents: &vertex_bytes[..],
@@ -256,9 +254,9 @@ impl State {
     }
 
     fn write_uniform(&self, uniform: &UniformBuffer) {
-        let s = uniform.as_std430();
+        let s = uniform.to_buffer();
         self.queue
-            .write_buffer(&self.uniform_buffer, 0, s.as_bytes());
+            .write_buffer(&self.uniform_buffer, 0, &s.into_inner());
     }
 }
 

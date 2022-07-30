@@ -12,6 +12,6 @@ env_logger = "0.9"
 log = "0.4"
 wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "59d640a" }
 pollster = "0.2"
-crevice = {version = "0.8.0"}
-mint = "0.5"
 nanorand = "0.7"
+glam = { version = "0.21.2", features = ["mint"] }
+encase = { version = "0.3", features = ["glam"]}

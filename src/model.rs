@@ -1,12 +1,12 @@
 use std::time::Instant;
 
-use crevice::std430::{AsStd430, Std430};
-use mint::{ColumnMatrix4, Quaternion, Vector2, Vector3};
+use encase::ShaderType;
+use glam::{Mat4, Vec2, Vec3};
 
-#[derive(AsStd430, Clone)]
+#[derive(ShaderType, Clone)]
 pub struct Vertex {
-    pub position: mint::Vector3<f32>,
-    pub pixel: mint::Vector2<f32>,
+    pub position: Vec3,
+    pub pixel: Vec2,
 }
 
 impl Vertex {
@@ -25,69 +25,76 @@ impl Vertex {
     pub fn square() -> Vec<Vertex> {
         vec![
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: -1.0,
                     y: 1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 0.0, y: 1.0 },
+                pixel: Vec2 { x: 0.0, y: 1.0 },
             },
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: -1.0,
                     y: -1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 0.0, y: 0.0 },
+                pixel: Vec2 { x: 0.0, y: 0.0 },
             },
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: 1.0,
                     y: -1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 1.0, y: 0.0 },
+                pixel: Vec2 { x: 1.0, y: 0.0 },
             },
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: -1.0,
                     y: 1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 0.0, y: 1.0 },
+                pixel: Vec2 { x: 0.0, y: 1.0 },
             },
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: 1.0,
                     y: -1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 1.0, y: 0.0 },
+                pixel: Vec2 { x: 1.0, y: 0.0 },
             },
             Vertex {
-                position: mint::Vector3::<f32> {
+                position: Vec3 {
                     x: 1.0,
                     y: 1.0,
                     z: 0.0,
                 },
-                pixel: mint::Vector2::<f32> { x: 1.0, y: 1.0 },
+                pixel: Vec2 { x: 1.0, y: 1.0 },
             },
         ]
     }
 }
 
-#[derive(AsStd430)]
+#[derive(ShaderType)]
 pub struct UniformBuffer {
     time: f32,
-    camera: mint::ColumnMatrix4<f32>,
+    camera: Mat4,
+}
+impl UniformBuffer {
+    pub fn to_buffer(&self) -> encase::UniformBuffer<Vec<u8>> {
+        let mut buffer = encase::UniformBuffer::new(Vec::new());
+        buffer.write(&self);
+        buffer
+    }
 }
 
 pub struct Scene {
     start: Instant,
     time: f32,
     previous: f32,
-    camera_pos: mint::Vector3<f32>,
-    camera_angle: mint::Vector2<f32>,
+    camera_pos: Vec3,
+    camera_angle: Vec2,
 }
 impl Scene {
     pub fn new() -> Scene {
@@ -115,12 +122,6 @@ impl Scene {
 }
 
 #[rustfmt::skip]
-fn to_matrix(q: &Vector2<f32>, translation: &Vector3<f32>) -> ColumnMatrix4<f32> {
-    [
-        q.x.cos(), q.x.sin() * q.y.sin(), q.x.sin() * q.y.cos(), translation.x,
-        0.0, q.y.cos(), q.y.sin(), translation.y,
-        -1.0 * q.x.sin(), q.x.cos() * q.y.sin(), q.x.cos() * q.y.cos(), translation.y,
-        0.0, 0.0, 0.0, 1.0,
-        
-    ].into()
+fn to_matrix(q: &Vec2, translation: &Vec3) -> Mat4 {
+    Mat4::IDENTITY
 }
