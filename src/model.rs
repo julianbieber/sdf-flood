@@ -1,7 +1,8 @@
 use std::time::Instant;
 
 use encase::ShaderType;
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Affine3A, EulerRot, Mat4, Quat, Vec2, Vec3};
+use winit::event::DeviceEvent;
 
 #[derive(ShaderType, Clone)]
 pub struct Vertex {
@@ -93,8 +94,13 @@ pub struct Scene {
     start: Instant,
     time: f32,
     previous: f32,
-    camera_pos: Vec3,
+    w_pressed: bool,
+    a_pressed: bool,
+    s_pressed: bool,
+    d_pressed: bool,
+    mouse_delta: Vec2,
     camera_angle: Vec2,
+    current_affine: Affine3A,
 }
 impl Scene {
     pub fn new() -> Scene {
@@ -102,26 +108,48 @@ impl Scene {
             start: Instant::now(),
             time: 0.0,
             previous: 0.0,
-            camera_pos: [0.0f32, 0.0f32, 0.0f32].into(),
             camera_angle: [0.0f32, 0.0f32].into(),
+            current_affine: Affine3A::IDENTITY,
+            w_pressed: false,
+            a_pressed: false,
+            s_pressed: false,
+            d_pressed: false,
+            mouse_delta: Vec2::ZERO,
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn register_device_event(&mut self, event: &DeviceEvent) {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                self.mouse_delta += Vec2::new(delta.0 as f32, delta.1 as f32)
+            }
+            _ => {}
+        }
+    }
+
+    pub fn update(&mut self, translation_vec: Vec3) {
         self.previous = self.time;
         self.time = self.start.elapsed().as_secs_f32();
         let elapsed = self.time - self.previous;
+
+        self.camera_angle += self.mouse_delta;
+        self.camera_angle.y = self
+            .camera_angle
+            .y
+            .max(std::f32::consts::PI)
+            .min(std::f32::consts::PI * -1.0);
+        self.current_affine = Affine3A::from_rotation_translation(
+            Quat::from_euler(EulerRot::XYZ, self.camera_angle.y, self.camera_angle.x, 0.0),
+            self.current_affine.translation.into(),
+        );
+
+        self.mouse_delta = Vec2::ZERO;
     }
 
     pub fn buffer(&self) -> UniformBuffer {
         UniformBuffer {
             time: self.time,
-            camera: to_matrix(&self.camera_angle, &self.camera_pos),
+            camera: Mat4::from(self.current_affine),
         }
     }
-}
-
-#[rustfmt::skip]
-fn to_matrix(q: &Vec2, translation: &Vec3) -> Mat4 {
-    Mat4::IDENTITY
 }
