@@ -59,18 +59,7 @@ fn main() {
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 state.resize(**new_inner_size)
             }
-            WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state,
-                        virtual_keycode: Some(key),
-                        ..
-                    },
-                ..
-            } => match state {
-                ElementState::Pressed => {}
-                _ => {}
-            },
+            WindowEvent::KeyboardInput { input, .. } => scene.register_key_event(input),
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {

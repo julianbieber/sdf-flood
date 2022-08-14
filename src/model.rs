@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use encase::ShaderType;
 use glam::{Affine3A, EulerRot, Mat4, Quat, Vec2, Vec3};
-use winit::event::DeviceEvent;
+use winit::event::{DeviceEvent, KeyboardInput};
 
 #[derive(ShaderType, Clone)]
 pub struct Vertex {
@@ -126,8 +126,18 @@ impl Scene {
             _ => {}
         }
     }
+    pub fn register_key_event(&mut self, key: &KeyboardInput) {
+        match key {
+            KeyboardInput {
+                scancode,
+                state,
+                virtual_keycode,
+                modifiers,
+            } => {}
+        }
+    }
 
-    pub fn update(&mut self, translation_vec: Vec3) {
+    pub fn update(&mut self) {
         self.previous = self.time;
         self.time = self.start.elapsed().as_secs_f32();
         let elapsed = self.time - self.previous;
