@@ -6,13 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "0.23"
-winit = "0.26"
-cgmath = "0.18"
-env_logger = "0.9"
+image = "0.24"
+winit = "0.28"
+env_logger = "0.10"
 log = "0.4"
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "59d640a" }
-pollster = "0.2"
-crevice = {version = "0.8.0"}
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "66c029f", features = ["glsl"] }
+pollster = "0.3"
+crevice = {version = "0.13.0"}
 mint = "0.5"
 nanorand = "0.7"
+
+[dependencies.naga]
+git = "https://github.com/gfx-rs/naga"
+rev = "b99d58ea435090e561377949f428bce2c18451bb"
+version = "0.12.0"
+features = ["clone"]
