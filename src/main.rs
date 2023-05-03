@@ -281,7 +281,7 @@ impl State {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
                 shader: include_str!("vertex.glsl").into(),
-                stage: naga::ShaderStage::Fragment,
+                stage: naga::ShaderStage::Vertex,
                 defines: naga::FastHashMap::default(),
             },
         });
@@ -296,46 +296,46 @@ impl State {
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 0,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 1,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 2,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 3,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
             ],
         });
         let (light_pos_buffer, light_att_buffer, sphere_pos_buffer, sphere_att_buffer) = {
@@ -367,7 +367,8 @@ impl State {
             });
         let render_pipeline =
             device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
-                &shader,
+                &vertex_shader,
+                &fragment_shader,
                 &render_pipeline_layout,
                 &[Some(wgpu::ColorTargetState {
                     format: config.format,
@@ -498,22 +499,22 @@ fn create_bind_group(
         label: None,
         layout,
         entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: sphere_pos_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: sphere_att_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: light_pos_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: light_att_buffer.as_entire_binding(),
-            },
+            // wgpu::BindGroupEntry {
+            //     binding: 0,
+            //     resource: sphere_pos_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 1,
+            //     resource: sphere_att_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 2,
+            //     resource: light_pos_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 3,
+            //     resource: light_att_buffer.as_entire_binding(),
+            // },
         ],
     });
     bind_group

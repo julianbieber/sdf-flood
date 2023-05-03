@@ -12,7 +12,7 @@ pub fn render_pipeline_descriptor<'a>(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: vertex_shader,
-            entry_point: "vs_main",
+            entry_point: "main",
             buffers: vertex_buffer_layout,
         },
         primitive: wgpu::PrimitiveState {
@@ -32,7 +32,7 @@ pub fn render_pipeline_descriptor<'a>(
         },
         fragment: Some(wgpu::FragmentState {
             module: fragment_shader,
-            entry_point: "fs_main",
+            entry_point: "main",
             targets: render_target,
         }),
         multiview: None,
