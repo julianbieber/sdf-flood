@@ -280,7 +280,7 @@ impl State {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
-                shader: include_str!("vertex.glsl").into(),
+                shader: include_str!("shader.vert").into(),
                 stage: naga::ShaderStage::Vertex,
                 defines: naga::FastHashMap::default(),
             },
@@ -288,7 +288,7 @@ impl State {
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("fragment_shader"),
             source: wgpu::ShaderSource::Glsl {
-                shader: include_str!("fragment.glsl").into(),
+                shader: include_str!("shader.frag").into(),
                 stage: naga::ShaderStage::Fragment,
                 defines: naga::FastHashMap::default(),
             },
