@@ -21,6 +21,21 @@ float fov_factor() {
     return tan(FOV / 2 * PI / 180);
 }
 
+int follow_ray(vec3 start, vec3 direction, int steps) {
+    int hit = -1;
+    for (int i = 0; i < 100; ++i) {
+        float d = scene(start);
+        if (d < 0.0001) {
+            out_color = vec4(uv, 0.0, 1.0);
+            break;
+        }
+        start += direction;
+        out_color = vec4(0.0);
+    }
+
+    return hit;
+}
+
 void main(){
     float fov = fov_factor();
     vec3 pixel_position = vec3((uv.x - 0.5) / 1.200 * fov, (uv.y - 0.5) / 1.920 * fov, 0.0);

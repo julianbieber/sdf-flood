@@ -2,13 +2,14 @@ mod model;
 mod render_pipeline;
 mod util;
 
-use std::collections::HashMap;
+use std::path::PathBuf;
 
+use clap::Parser;
 use model::{create_sphere_attribute_buffer, Scene, Spheres, Vertex};
 use util::FPS;
 use wgpu::{
     util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
-    Device, ShaderStages,
+    Device,
 };
 use winit::{
     event::*,
@@ -16,8 +17,24 @@ use winit::{
     window::{Fullscreen, WindowBuilder},
 };
 
+#[derive(Parser, Debug)]
+struct Opt {
+    #[arg(long, default_value = "shaders")]
+    shader_dir: PathBuf,
+    #[arg(long, default_value = "shader")]
+    shader_name: String,
+}
+
 fn main() {
     env_logger::init();
+
+    let opt = Opt::parse();
+
+    let v = opt.shader_name;
+    let vertex_shader_path = opt.shader_dir.join(format!("{v}.vert"));
+    let vertex_shader = std::fs::read_to_string(vertex_shader_path).unwrap();
+    let fragment_shader_path = opt.shader_dir.join(format!("{v}.frag"));
+    let fragment_shader = std::fs::read_to_string(fragment_shader_path).unwrap();
 
     let vertices = Vertex::square();
     let spheres = vec![
@@ -152,7 +169,13 @@ fn main() {
         )))
         .build(&event_loop)
         .unwrap();
-    let mut state = pollster::block_on(State::new(&window, &vertices, &mut scene));
+    let mut state = pollster::block_on(State::new(
+        &window,
+        &vertices,
+        &mut scene,
+        &vertex_shader,
+        &fragment_shader,
+    ));
     let mut fps = FPS::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -228,7 +251,13 @@ struct State {
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &Window, vertices: &Vec<Vertex>, scene: &mut Scene) -> Self {
+    async fn new(
+        window: &Window,
+        vertices: &Vec<Vertex>,
+        scene: &mut Scene,
+        vertex_shader_s: &str,
+        fragment_shader_s: &str,
+    ) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::VULKAN,
@@ -280,7 +309,7 @@ impl State {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
-                shader: include_str!("shader.vert").into(),
+                shader: vertex_shader_s.into(),
                 stage: naga::ShaderStage::Vertex,
                 defines: naga::FastHashMap::default(),
             },
@@ -288,7 +317,7 @@ impl State {
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("fragment_shader"),
             source: wgpu::ShaderSource::Glsl {
-                shader: include_str!("shader.frag").into(),
+                shader: fragment_shader_s.into(),
                 stage: naga::ShaderStage::Fragment,
                 defines: naga::FastHashMap::default(),
             },

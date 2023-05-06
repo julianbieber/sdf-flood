@@ -15,6 +15,7 @@ pollster = "0.3"
 crevice = {version = "0.13.0"}
 mint = "0.5"
 nanorand = "0.7"
+clap = { version = "4.2.7", features = ["derive"] }
 
 [dependencies.naga]
 git = "https://github.com/gfx-rs/naga"
