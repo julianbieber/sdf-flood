@@ -48,7 +48,7 @@ void main(){
             out_color = vec4(uv, 0.0, 1.0);
             break;
         }
-        eye_position += ray_direction;
+        eye_position += ray_direction * d;
         out_color = vec4(0.0);
     }
 } 
