@@ -1,17 +1,18 @@
 use crate::model::Vertex;
 
 pub fn render_pipeline_descriptor<'a>(
-    shader: &'a wgpu::ShaderModule,
+    vertex_shader: &'a wgpu::ShaderModule,
+    fragment_shader: &'a wgpu::ShaderModule,
     layout: &'a wgpu::PipelineLayout,
-    render_target: &'a [wgpu::ColorTargetState],
+    render_target: &'a [Option<wgpu::ColorTargetState>],
     vertex_buffer_layout: &'a [wgpu::VertexBufferLayout],
 ) -> wgpu::RenderPipelineDescriptor<'a> {
     wgpu::RenderPipelineDescriptor {
         label: Some("render pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: "vs_main",
+            module: vertex_shader,
+            entry_point: "main",
             buffers: vertex_buffer_layout,
         },
         primitive: wgpu::PrimitiveState {
@@ -30,8 +31,8 @@ pub fn render_pipeline_descriptor<'a>(
             alpha_to_coverage_enabled: false,
         },
         fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: "fs_main",
+            module: fragment_shader,
+            entry_point: "main",
             targets: render_target,
         }),
         multiview: None,

@@ -2,12 +2,14 @@ mod model;
 mod render_pipeline;
 mod util;
 
-use std::time::Instant;
+use std::path::PathBuf;
 
-use model::{create_sphere_attribute_buffer, Scene, Sphere, Spheres, Vertex};
+use clap::Parser;
+use model::{create_sphere_attribute_buffer, Scene, Spheres, Vertex};
 use util::FPS;
 use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device,
+    util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
+    Device,
 };
 use winit::{
     event::*,
@@ -15,8 +17,24 @@ use winit::{
     window::{Fullscreen, WindowBuilder},
 };
 
+#[derive(Parser, Debug)]
+struct Opt {
+    #[arg(long, default_value = "shaders")]
+    shader_dir: PathBuf,
+    #[arg(long, default_value = "shader")]
+    shader_name: String,
+}
+
 fn main() {
     env_logger::init();
+
+    let opt = Opt::parse();
+
+    let v = opt.shader_name;
+    let vertex_shader_path = opt.shader_dir.join(format!("{v}.vert"));
+    let vertex_shader = std::fs::read_to_string(vertex_shader_path).unwrap();
+    let fragment_shader_path = opt.shader_dir.join(format!("{v}.frag"));
+    let fragment_shader = std::fs::read_to_string(fragment_shader_path).unwrap();
 
     let vertices = Vertex::square();
     let spheres = vec![
@@ -151,7 +169,13 @@ fn main() {
         )))
         .build(&event_loop)
         .unwrap();
-    let mut state = pollster::block_on(State::new(&window, &vertices, &mut scene));
+    let mut state = pollster::block_on(State::new(
+        &window,
+        &vertices,
+        &mut scene,
+        &vertex_shader,
+        &fragment_shader,
+    ));
     let mut fps = FPS::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -227,10 +251,19 @@ struct State {
 
 impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &Window, vertices: &Vec<Vertex>, scene: &mut Scene) -> Self {
+    async fn new(
+        window: &Window,
+        vertices: &Vec<Vertex>,
+        scene: &mut Scene,
+        vertex_shader_s: &str,
+        fragment_shader_s: &str,
+    ) -> Self {
         let size = window.inner_size();
-        let instance = wgpu::Instance::new(wgpu::Backends::VULKAN);
-        let surface = unsafe { instance.create_surface(window) };
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: Backends::VULKAN,
+            dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+        });
+        let surface = unsafe { instance.create_surface(window).unwrap() };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -239,7 +272,17 @@ impl State {
             })
             .await
             .unwrap();
-
+        let surface_caps = surface.get_capabilities(&adapter);
+        // Shader code in this tutorial assumes an sRGB surface texture. Using a different
+        // one will result all the colors coming out darker. If you want to support non
+        // sRGB surfaces, you'll need to account for that when drawing to the frame.
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .filter(|f| f.is_srgb())
+            .next()
+            .unwrap_or(surface_caps.formats[0]);
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -254,60 +297,74 @@ impl State {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_preferred_format(&adapter).unwrap(),
+            format: surface_format,
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Immediate,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
         };
         surface.configure(&device, &config);
 
-        let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some("shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("vertex_shader"),
+            source: wgpu::ShaderSource::Glsl {
+                shader: vertex_shader_s.into(),
+                stage: naga::ShaderStage::Vertex,
+                defines: naga::FastHashMap::default(),
+            },
+        });
+        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("fragment_shader"),
+            source: wgpu::ShaderSource::Glsl {
+                shader: fragment_shader_s.into(),
+                stage: naga::ShaderStage::Fragment,
+                defines: naga::FastHashMap::default(),
+            },
         });
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 0,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 1,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 2,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 3,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
             ],
         });
         let (light_pos_buffer, light_att_buffer, sphere_pos_buffer, sphere_att_buffer) = {
@@ -339,13 +396,14 @@ impl State {
             });
         let render_pipeline =
             device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
-                &shader,
+                &vertex_shader,
+                &fragment_shader,
                 &render_pipeline_layout,
-                &[wgpu::ColorTargetState {
+                &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
+                })],
                 &[Vertex::desc()],
             ));
         let mut vertex_bytes = vec![];
@@ -436,14 +494,14 @@ impl State {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachment {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
                         store: true,
                     },
-                }],
+                })],
                 depth_stencil_attachment: None,
             });
 
@@ -470,22 +528,22 @@ fn create_bind_group(
         label: None,
         layout,
         entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: sphere_pos_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: sphere_att_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: light_pos_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: light_att_buffer.as_entire_binding(),
-            },
+            // wgpu::BindGroupEntry {
+            //     binding: 0,
+            //     resource: sphere_pos_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 1,
+            //     resource: sphere_att_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 2,
+            //     resource: light_pos_buffer.as_entire_binding(),
+            // },
+            // wgpu::BindGroupEntry {
+            //     binding: 3,
+            //     resource: light_att_buffer.as_entire_binding(),
+            // },
         ],
     });
     bind_group
