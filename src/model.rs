@@ -93,6 +93,16 @@ pub fn create_sphere_buffer(device: &Device, spheres: &Vec<SpherePos>) -> Buffer
         usage: wgpu::BufferUsages::STORAGE,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
 }
+pub fn create_time_buffer(device: &Device, time: f32) -> Buffer {
+    let mut bytes = vec![];
+    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+    sphere_bytes_writer.write(&time).unwrap();
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("time"),
+        contents: &bytes[..],
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}
 
 #[derive(AsStd430, Clone)]
 pub struct SphereAttribute {

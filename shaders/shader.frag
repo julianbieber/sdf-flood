@@ -2,6 +2,7 @@
 layout (location = 0) out vec4 out_color;
   
 layout (location = 0) in vec2 uv; // the input variable from the vertex shader (same name and same type)  
+layout (binding  = 0) uniform float time;
 
 
 #define PI 3.1415926538
@@ -49,6 +50,6 @@ void main(){
             break;
         }
         eye_position += ray_direction * d;
-        out_color = vec4(0.0);
+        out_color = vec4(sin(time));
     }
 } 

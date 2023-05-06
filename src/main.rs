@@ -2,10 +2,13 @@ mod model;
 mod render_pipeline;
 mod util;
 
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use clap::Parser;
-use model::{create_sphere_attribute_buffer, Scene, Spheres, Vertex};
+use model::{create_sphere_attribute_buffer, create_time_buffer, Scene, Spheres, Vertex};
 use util::FPS;
 use wgpu::{
     util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
@@ -177,6 +180,7 @@ fn main() {
         &fragment_shader,
     ));
     let mut fps = FPS::new();
+    let start = Instant::now();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
@@ -214,7 +218,7 @@ fn main() {
             fps.presented();
             dbg!(fps.fps());
             scene.animate_birthday();
-            match state.render(&mut scene) {
+            match state.render(&mut scene, start.elapsed()) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
@@ -242,10 +246,7 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     vertices: Vec<u8>,
-    sphere_pos_buffer: Buffer,
-    sphere_att_buffer: Buffer,
-    light_pos_buffer: Buffer,
-    light_att_buffer: Buffer,
+    time_buffer: Buffer,
     num_vertices: usize,
 }
 
@@ -325,16 +326,16 @@ impl State {
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
-                // wgpu::BindGroupLayoutEntry {
-                //     binding: 0,
-                //     visibility: wgpu::ShaderStages::FRAGMENT,
-                //     ty: wgpu::BindingType::Buffer {
-                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
-                //         has_dynamic_offset: false,
-                //         min_binding_size: None,
-                //     },
-                //     count: None,
-                // },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform {},
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
                 // wgpu::BindGroupLayoutEntry {
                 //     binding: 1,
                 //     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -367,27 +368,8 @@ impl State {
                 // },
             ],
         });
-        let (light_pos_buffer, light_att_buffer, sphere_pos_buffer, sphere_att_buffer) = {
-            let (lights, spheres) = scene.get_changed();
-
-            let (lights_pos, lights_att) = lights.unwrap().split_to_buffers();
-            let light_pos_buffer = create_sphere_buffer(&device, &lights_pos);
-            let light_att_buffer = create_sphere_attribute_buffer(&device, &lights_att);
-
-            let (pos, att) = spheres.unwrap().split_to_buffers();
-            let pos_buffer = create_sphere_buffer(&device, &pos);
-            let att_buffer = create_sphere_attribute_buffer(&device, &att);
-
-            (light_pos_buffer, light_att_buffer, pos_buffer, att_buffer)
-        };
-        let bind_group = create_bind_group(
-            &device,
-            &bind_group_layout,
-            &light_pos_buffer,
-            &light_att_buffer,
-            &sphere_pos_buffer,
-            &sphere_att_buffer,
-        );
+        let light_buffer = create_time_buffer(&device, 0.0);
+        let bind_group = create_bind_group(&device, &bind_group_layout, &light_buffer);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
@@ -427,11 +409,8 @@ impl State {
             vertex_buffer,
             bind_group,
             vertices: vertex_bytes,
-            light_pos_buffer,
-            light_att_buffer,
-            sphere_pos_buffer,
-            sphere_att_buffer,
             num_vertices: vertices.len(),
+            time_buffer: light_buffer,
         }
     }
 
@@ -448,44 +427,16 @@ impl State {
         false
     }
 
-    fn render(&mut self, scene: &mut Scene) -> Result<(), wgpu::SurfaceError> {
+    fn render(&mut self, scene: &mut Scene, duration: Duration) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let changed = {
-            let (l_o, s_o) = scene.get_changed();
-            l_o.iter().for_each(|l| {
-                let (pos, att) = l.split_to_buffers();
-                let new_pos_buffer = create_sphere_buffer(&self.device, &pos);
-                let new_att_buffer = create_sphere_attribute_buffer(&self.device, &att);
-                self.light_pos_buffer.destroy();
-                self.light_att_buffer.destroy();
-                self.light_pos_buffer = new_pos_buffer;
-                self.light_att_buffer = new_att_buffer;
-            });
-            s_o.iter().for_each(|s| {
-                let (pos, att) = s.split_to_buffers();
-                let new_pos_buffer = create_sphere_buffer(&self.device, &pos);
-                let new_att_buffer = create_sphere_attribute_buffer(&self.device, &att);
-                self.sphere_pos_buffer.destroy();
-                self.sphere_att_buffer.destroy();
-                self.sphere_pos_buffer = new_pos_buffer;
-                self.sphere_att_buffer = new_att_buffer;
-            });
-            l_o.is_some() || s_o.is_some()
-        };
-        if changed {
-            let layout = self.render_pipeline.get_bind_group_layout(0);
-            self.bind_group = create_bind_group(
-                &self.device,
-                &layout,
-                &self.light_pos_buffer,
-                &self.light_att_buffer,
-                &self.sphere_pos_buffer,
-                &self.sphere_att_buffer,
-            );
-        }
+        let new = create_time_buffer(&self.device, duration.as_secs_f32());
+        self.time_buffer.destroy();
+        self.time_buffer = new;
+        let layout = self.render_pipeline.get_bind_group_layout(0);
+        self.bind_group = create_bind_group(&self.device, &layout, &self.time_buffer);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -516,22 +467,15 @@ impl State {
     }
 }
 
-fn create_bind_group(
-    device: &Device,
-    layout: &BindGroupLayout,
-    light_pos_buffer: &Buffer,
-    light_att_buffer: &Buffer,
-    sphere_pos_buffer: &Buffer,
-    sphere_att_buffer: &Buffer,
-) -> BindGroup {
+fn create_bind_group(device: &Device, layout: &BindGroupLayout, time_buffer: &Buffer) -> BindGroup {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
         entries: &[
-            // wgpu::BindGroupEntry {
-            //     binding: 0,
-            //     resource: sphere_pos_buffer.as_entire_binding(),
-            // },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: time_buffer.as_entire_binding(),
+            },
             // wgpu::BindGroupEntry {
             //     binding: 1,
             //     resource: sphere_att_buffer.as_entire_binding(),
