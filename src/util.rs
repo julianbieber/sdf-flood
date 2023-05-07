@@ -1,14 +1,14 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-pub struct FPS {
+pub struct Fps {
     buffer: [u64; 32],
     next: usize,
     now: Instant,
 }
 
-impl FPS {
-    pub fn new() -> FPS {
-        FPS {
+impl Fps {
+    pub fn new() -> Fps {
+        Fps {
             buffer: [0; 32],
             next: 0,
             now: Instant::now(),
@@ -20,7 +20,7 @@ impl FPS {
         self.now = Instant::now();
         self.buffer[self.next] = t.as_millis() as u64;
         self.next += 1;
-        self.next = self.next % 32;
+        self.next %= 32;
     }
 
     pub fn fps(&self) -> f32 {

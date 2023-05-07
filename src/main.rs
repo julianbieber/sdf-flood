@@ -8,8 +8,8 @@ use std::{
 };
 
 use clap::Parser;
-use model::{create_sphere_attribute_buffer, create_time_buffer, Scene, Spheres, Vertex};
-use util::FPS;
+use model::{create_time_buffer, Vertex};
+use util::Fps;
 use wgpu::{
     util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
     Device,
@@ -22,10 +22,8 @@ use winit::{
 
 #[derive(Parser, Debug)]
 struct Opt {
-    #[arg(long, default_value = "shaders")]
-    shader_dir: PathBuf,
-    #[arg(long, default_value = "shader")]
-    shader_name: String,
+    #[arg(long, default_value = "shaders/shader.frag")]
+    shader_path: PathBuf,
 }
 
 fn main() {
@@ -33,131 +31,12 @@ fn main() {
 
     let opt = Opt::parse();
 
-    let v = opt.shader_name;
-    let vertex_shader_path = opt.shader_dir.join(format!("{v}.vert"));
-    let vertex_shader = std::fs::read_to_string(vertex_shader_path).unwrap();
-    let fragment_shader_path = opt.shader_dir.join(format!("{v}.frag"));
-    let fragment_shader = std::fs::read_to_string(fragment_shader_path).unwrap();
+    let vertex_shader = include_str!("shader.vert");
+    let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
 
     let vertices = Vertex::square();
-    let spheres = vec![
-        model::Sphere {
-            radius: 1.5,
-            center: mint::Vector3 {
-                x: 0.0f32,
-                y: -2.5f32,
-                z: 5.0f32,
-            },
-            color: mint::Vector3 {
-                x: 1.0f32,
-                y: 0.0f32,
-                z: 0.0f32,
-            },
-            reflectivity: 0.0f32,
-        },
-        model::Sphere {
-            radius: 1.0,
-            center: mint::Vector3 {
-                x: 0.0f32,
-                y: 0.0f32,
-                z: 5.0f32,
-            },
-            color: mint::Vector3 {
-                x: 1.0f32,
-                y: 1.0f32,
-                z: 1.0f32,
-            },
-            reflectivity: 1.0f32,
-        },
-        model::Sphere {
-            radius: 0.5,
-            center: mint::Vector3 {
-                x: 0.0f32,
-                y: 1.5f32,
-                z: 5.0f32,
-            },
-            color: mint::Vector3 {
-                x: 1.0f32,
-                y: 1.0f32,
-                z: 1.0f32,
-            },
-            reflectivity: 1.0f32,
-        },
-        model::Sphere {
-            color: mint::Vector3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            center: mint::Vector3 {
-                x: -0.1,
-                y: 1.6,
-                z: 4.5f32,
-            },
-            radius: 0.1,
-            reflectivity: 0.0f32,
-        },
-        model::Sphere {
-            color: mint::Vector3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            center: mint::Vector3 {
-                x: 0.1,
-                y: 1.6,
-                z: 4.5f32,
-            },
-            radius: 0.1,
-            reflectivity: 0.0f32,
-        },
-        model::Sphere {
-            color: mint::Vector3 {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            center: mint::Vector3 {
-                x: 0.0,
-                y: 1.3,
-                z: 4.5f32,
-            },
-            radius: 0.1,
-            reflectivity: 0.0f32,
-        },
-        model::Sphere {
-            color: mint::Vector3 {
-                x: 0.3,
-                y: 0.8,
-                z: 0.27,
-            },
-            center: mint::Vector3 {
-                x: 0.0,
-                y: -50.0,
-                z: 20.0,
-            },
-            radius: 50.0,
-            reflectivity: 0.5f32,
-        },
-    ];
-
-    let light_spheres = vec![model::Sphere {
-        color: mint::Vector3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        },
-        center: mint::Vector3 {
-            x: 0.0,
-            y: 10.0,
-            z: 0.0,
-        },
-        radius: 1.0,
-        reflectivity: 0.0f32,
-    }];
 
     // let mut scene = Scene::new(light_spheres, spheres);
-    let mut scene = Scene::birthday();
     let event_loop = EventLoop::new();
     let mut video_modes: Vec<_> = event_loop
         .available_monitors()
@@ -175,11 +54,10 @@ fn main() {
     let mut state = pollster::block_on(State::new(
         &window,
         &vertices,
-        &mut scene,
         &vertex_shader,
         &fragment_shader,
     ));
-    let mut fps = FPS::new();
+    let mut fps = Fps::new();
     let start = Instant::now();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -200,25 +78,12 @@ fn main() {
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 state.resize(**new_inner_size)
             }
-            WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state,
-                        virtual_keycode: Some(key),
-                        ..
-                    },
-                ..
-            } => match state {
-                ElementState::Pressed => {}
-                _ => {}
-            },
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             fps.presented();
             dbg!(fps.fps());
-            scene.animate_birthday();
-            match state.render(&mut scene, start.elapsed()) {
+            match state.render(start.elapsed()) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
@@ -234,8 +99,6 @@ fn main() {
 
 use winit::window::Window;
 
-use crate::model::create_sphere_buffer;
-
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -245,7 +108,6 @@ struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    vertices: Vec<u8>,
     time_buffer: Buffer,
     num_vertices: usize,
 }
@@ -255,7 +117,6 @@ impl State {
     async fn new(
         window: &Window,
         vertices: &Vec<Vertex>,
-        scene: &mut Scene,
         vertex_shader_s: &str,
         fragment_shader_s: &str,
     ) -> Self {
@@ -277,12 +138,17 @@ impl State {
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
         // one will result all the colors coming out darker. If you want to support non
         // sRGB surfaces, you'll need to account for that when drawing to the frame.
-        let surface_format = surface_caps
+        let surface_formats: Vec<_> = surface_caps
             .formats
             .iter()
             .copied()
             .filter(|f| f.is_srgb())
-            .next()
+            .collect();
+        // dbg!(&surface_formats);
+        // panic!("");
+        let surface_format = surface_formats
+            .first()
+            .copied()
             .unwrap_or(surface_caps.formats[0]);
         let (device, queue) = adapter
             .request_device(
@@ -408,7 +274,6 @@ impl State {
             render_pipeline,
             vertex_buffer,
             bind_group,
-            vertices: vertex_bytes,
             num_vertices: vertices.len(),
             time_buffer: light_buffer,
         }
@@ -423,18 +288,15 @@ impl State {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, _event: &WindowEvent) -> bool {
         false
     }
 
-    fn render(&mut self, scene: &mut Scene, duration: Duration) -> Result<(), wgpu::SurfaceError> {
+    fn render(&mut self, duration: Duration) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let new = create_time_buffer(&self.device, duration.as_secs_f32());
-        self.time_buffer.destroy();
-        self.time_buffer = new;
         let layout = self.render_pipeline.get_bind_group_layout(0);
         self.bind_group = create_bind_group(&self.device, &layout, &self.time_buffer);
         let mut encoder = self
@@ -461,6 +323,10 @@ impl State {
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.draw(0..self.num_vertices as u32, 0..1);
         }
+        let mut bytes = vec![];
+        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+        sphere_bytes_writer.write(&duration.as_secs_f32()).unwrap();
+        self.queue.write_buffer(&self.time_buffer, 0, &bytes);
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())
@@ -471,24 +337,10 @@ fn create_bind_group(device: &Device, layout: &BindGroupLayout, time_buffer: &Bu
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: time_buffer.as_entire_binding(),
-            },
-            // wgpu::BindGroupEntry {
-            //     binding: 1,
-            //     resource: sphere_att_buffer.as_entire_binding(),
-            // },
-            // wgpu::BindGroupEntry {
-            //     binding: 2,
-            //     resource: light_pos_buffer.as_entire_binding(),
-            // },
-            // wgpu::BindGroupEntry {
-            //     binding: 3,
-            //     resource: light_att_buffer.as_entire_binding(),
-            // },
-        ],
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: time_buffer.as_entire_binding(),
+        }],
     });
     bind_group
 }

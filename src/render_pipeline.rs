@@ -1,5 +1,3 @@
-use crate::model::Vertex;
-
 pub fn render_pipeline_descriptor<'a>(
     vertex_shader: &'a wgpu::ShaderModule,
     fragment_shader: &'a wgpu::ShaderModule,
