@@ -1,9 +1,11 @@
+mod audio;
 mod model;
 mod render_pipeline;
 mod util;
 
 use std::{
     path::PathBuf,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -28,6 +30,8 @@ struct Opt {
 
 fn main() {
     env_logger::init();
+    let o = Arc::new(Mutex::new(Vec::new()));
+    audio::start(o);
 
     let opt = Opt::parse();
 
@@ -54,7 +58,7 @@ fn main() {
     let mut state = pollster::block_on(State::new(
         &window,
         &vertices,
-        &vertex_shader,
+        vertex_shader,
         &fragment_shader,
     ));
     let mut fps = Fps::new();
@@ -82,7 +86,7 @@ fn main() {
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             fps.presented();
-            dbg!(fps.fps());
+            // dbg!(fps.fps());
             match state.render(start.elapsed()) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
@@ -338,54 +342,4 @@ fn create_bind_group(device: &Device, layout: &BindGroupLayout, time_buffer: &Bu
         }],
     });
     bind_group
-}
-use alsa::pcm::*;
-use alsa::{Direction, Error, ValueOr};
-use hound::{SampleFormat, WavWriter};
-use rustfft::num_complex::Complex32;
-
-fn start_capture(device: &str) -> Result<PCM, Error> {
-    let pcm = PCM::new(device, Direction::Capture, false)?;
-    {
-        // For this example, we assume 44100Hz, one channel, 16 bit audio.
-        let hwp = HwParams::any(&pcm)?;
-        hwp.set_channels(1)?;
-        hwp.set_rate(44100, ValueOr::Nearest)?;
-        hwp.set_format(Format::s16())?;
-        hwp.set_access(Access::RWInterleaved)?;
-        pcm.hw_params(&hwp)?;
-    }
-    pcm.start()?;
-    Ok(pcm)
-}
-
-fn read(pcm: &PCM) {
-    let io = pcm.io_i16().unwrap();
-
-    let num_samples = 44100 * 10;
-    let mut buffer = vec![0i16; num_samples];
-    for i in 0..num_samples {
-        let sample = io.readi(&mut buffer[i..i + 1]).unwrap();
-        if sample == 0 {
-            break;
-        }
-    }
-    dbg!(to_fft(&buffer));
-}
-
-fn to_fft(buffer: &[i16]) -> Vec<Complex32> {
-    use rustfft::{num_complex::Complex, FftPlanner};
-
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(buffer.len());
-
-    let mut buffer: Vec<_> = buffer
-        .iter()
-        .map(|e| Complex {
-            re: *e as f32,
-            im: 0.0f32,
-        })
-        .collect();
-    fft.process(&mut buffer);
-    buffer
 }
