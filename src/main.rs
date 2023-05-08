@@ -339,3 +339,53 @@ fn create_bind_group(device: &Device, layout: &BindGroupLayout, time_buffer: &Bu
     });
     bind_group
 }
+use alsa::pcm::*;
+use alsa::{Direction, Error, ValueOr};
+use hound::{SampleFormat, WavWriter};
+use rustfft::num_complex::Complex32;
+
+fn start_capture(device: &str) -> Result<PCM, Error> {
+    let pcm = PCM::new(device, Direction::Capture, false)?;
+    {
+        // For this example, we assume 44100Hz, one channel, 16 bit audio.
+        let hwp = HwParams::any(&pcm)?;
+        hwp.set_channels(1)?;
+        hwp.set_rate(44100, ValueOr::Nearest)?;
+        hwp.set_format(Format::s16())?;
+        hwp.set_access(Access::RWInterleaved)?;
+        pcm.hw_params(&hwp)?;
+    }
+    pcm.start()?;
+    Ok(pcm)
+}
+
+fn read(pcm: &PCM) {
+    let io = pcm.io_i16().unwrap();
+
+    let num_samples = 44100 * 10;
+    let mut buffer = vec![0i16; num_samples];
+    for i in 0..num_samples {
+        let sample = io.readi(&mut buffer[i..i + 1]).unwrap();
+        if sample == 0 {
+            break;
+        }
+    }
+    dbg!(to_fft(&buffer));
+}
+
+fn to_fft(buffer: &[i16]) -> Vec<Complex32> {
+    use rustfft::{num_complex::Complex, FftPlanner};
+
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(buffer.len());
+
+    let mut buffer: Vec<_> = buffer
+        .iter()
+        .map(|e| Complex {
+            re: *e as f32,
+            im: 0.0f32,
+        })
+        .collect();
+    fft.process(&mut buffer);
+    buffer
+}
