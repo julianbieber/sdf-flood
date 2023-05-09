@@ -142,6 +142,7 @@ impl State {
             .formats
             .iter()
             .copied()
+<<<<<<< Updated upstream
             .filter(|f| f.is_srgb())
             .collect();
         // dbg!(&surface_formats);
@@ -149,6 +150,10 @@ impl State {
         let surface_format = surface_formats
             .first()
             .copied()
+=======
+            .filter(|f| !f.is_srgb())
+            .next()
+>>>>>>> Stashed changes
             .unwrap_or(surface_caps.formats[0]);
         let (device, queue) = adapter
             .request_device(
