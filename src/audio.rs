@@ -8,24 +8,26 @@ use rustfft::num_complex::Complex32;
 use rustfft::FftPlanner;
 
 pub fn start(output: Arc<Mutex<Vec<f32>>>) -> JoinHandle<()> {
+    let length = output.lock().unwrap().len();
     std::thread::spawn(move || {
         let device = start_capture("default").unwrap();
         let io = device.io_i16().unwrap();
-        let mut chunk_buffer = vec![0i16; 315];
-        let mut ring_buffer = RingBuffer::new(3150);
+        let mut chunk_buffer = vec![0i16; length];
+        let mut ring_buffer = RingBuffer::new(length);
 
         let mut planner = FftPlanner::new();
-        let fft = planner.plan_fft_forward(3150);
+        let fft = planner.plan_fft_forward(length);
+        let scaling = length as f32;
         loop {
-            let start = Instant::now();
             io.readi(&mut chunk_buffer).unwrap();
             ring_buffer.add(&chunk_buffer);
-            let mut c = ring_buffer.complex_vector(); // TODO no allocation
+            let mut c = ring_buffer.complex_vector();
             fft.process(&mut c);
             let mut o = output.lock().unwrap();
-            *o = c.iter().map(|f| f.re).collect();
+            o.iter_mut().zip(c.iter()).for_each(|(o, c)| {
+                *o = c.re.sqrt() / scaling;
+            });
             drop(o);
-            dbg!(start.elapsed());
         }
     })
 }
@@ -33,6 +35,7 @@ pub fn start(output: Arc<Mutex<Vec<f32>>>) -> JoinHandle<()> {
 struct RingBuffer {
     buffer: Vec<i16>,
     current: usize,
+    c: Vec<Complex32>,
 }
 
 impl RingBuffer {
@@ -40,6 +43,7 @@ impl RingBuffer {
         RingBuffer {
             buffer: vec![0; size],
             current: 0,
+            c: Vec::with_capacity(size),
         }
     }
 
@@ -51,22 +55,22 @@ impl RingBuffer {
         }
     }
 
-    fn complex_vector(&self) -> Vec<Complex32> {
+    fn complex_vector(&mut self) -> &mut Vec<Complex32> {
         let mut i = (self.current + 1) % self.buffer.len();
-        let mut r = Vec::with_capacity(self.buffer.len());
+        self.c.clear();
         while i != self.current {
-            r.push(Complex32 {
+            self.c.push(Complex32 {
                 re: self.buffer[i] as f32,
                 im: 0.0,
             });
             i += 1;
             i %= self.buffer.len();
         }
-        r.push(Complex32 {
+        self.c.push(Complex32 {
             re: self.buffer[i] as f32,
             im: 0.0,
         });
-        r
+        &mut self.c
     }
 }
 
