@@ -3,6 +3,9 @@ layout (location = 0) out vec4 out_color;
   
 layout (location = 0) in vec2 uv; // the input variable from the vertex shader (same name and same type)
 layout (binding  = 0) uniform float time;
+layout (binding  = 1) readonly buffer fftBuffer{
+    float v[];
+} fft;
 
 
 #define ZWEIPIE 6.2831853071

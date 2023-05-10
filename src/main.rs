@@ -1,14 +1,16 @@
+mod audio;
 mod model;
 mod render_pipeline;
 mod util;
 
 use std::{
     path::PathBuf,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use clap::Parser;
-use model::{create_time_buffer, Vertex};
+use model::{create_fft_buffer, create_time_buffer, Vertex};
 use util::Fps;
 use wgpu::{
     util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
@@ -24,12 +26,16 @@ use winit::{
 struct Opt {
     #[arg(long, default_value = "shaders/shader.frag")]
     shader_path: PathBuf,
+    #[arg(long)]
+    srgb: bool,
 }
 
 fn main() {
     env_logger::init();
+    let o = Arc::new(Mutex::new(vec![0.0; 1920]));
+    audio::start(o.clone());
 
-    let opt = Opt::parse();
+    let opt = dbg!(Opt::parse());
 
     let vertex_shader = include_str!("shader.vert");
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
@@ -54,8 +60,10 @@ fn main() {
     let mut state = pollster::block_on(State::new(
         &window,
         &vertices,
-        &vertex_shader,
+        vertex_shader,
         &fragment_shader,
+        &o,
+        opt.srgb,
     ));
     let mut fps = Fps::new();
     let start = Instant::now();
@@ -82,8 +90,8 @@ fn main() {
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
             fps.presented();
-            dbg!(fps.fps());
-            match state.render(start.elapsed()) {
+            // dbg!(fps.fps());
+            match state.render(start.elapsed(), &o) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
@@ -109,6 +117,7 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     time_buffer: Buffer,
+    fft_buffer: Buffer,
     num_vertices: usize,
 }
 
@@ -119,6 +128,8 @@ impl State {
         vertices: &Vec<Vertex>,
         vertex_shader_s: &str,
         fragment_shader_s: &str,
+        fft: &Arc<Mutex<Vec<f32>>>,
+        srgb: bool,
     ) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -138,12 +149,12 @@ impl State {
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
         // one will result all the colors coming out darker. If you want to support non
         // sRGB surfaces, you'll need to account for that when drawing to the frame.
-        let surface_formats = surface_caps
+        let surface_format = surface_caps
             .formats
             .iter()
-            .copied()
-            .filter(|f| !f.is_srgb())
+            .filter(|f| if srgb { f.is_srgb() } else { !f.is_srgb() })
             .next()
+            .copied()
             .unwrap_or(surface_caps.formats[0]);
         let (device, queue) = adapter
             .request_device(
@@ -159,7 +170,7 @@ impl State {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_formats,
+            format: surface_format,
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Immediate,
@@ -197,16 +208,16 @@ impl State {
                     },
                     count: None,
                 },
-                // wgpu::BindGroupLayoutEntry {
-                //     binding: 1,
-                //     visibility: wgpu::ShaderStages::FRAGMENT,
-                //     ty: wgpu::BindingType::Buffer {
-                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
-                //         has_dynamic_offset: false,
-                //         min_binding_size: None,
-                //     },
-                //     count: None,
-                // },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
                 // wgpu::BindGroupLayoutEntry {
                 //     binding: 2,
                 //     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -229,8 +240,11 @@ impl State {
                 // },
             ],
         });
-        let light_buffer = create_time_buffer(&device, 0.0);
-        let bind_group = create_bind_group(&device, &bind_group_layout, &light_buffer);
+        let time_buffer = create_time_buffer(&device, 0.0);
+        let fft_lock = fft.lock().unwrap();
+        let fft_buffer = create_fft_buffer(&device, fft_lock.as_slice());
+        drop(fft_lock);
+        let bind_group = create_bind_group(&device, &bind_group_layout, &time_buffer, &fft_buffer);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
@@ -270,7 +284,8 @@ impl State {
             vertex_buffer,
             bind_group,
             num_vertices: vertices.len(),
-            time_buffer: light_buffer,
+            time_buffer,
+            fft_buffer,
         }
     }
 
@@ -287,13 +302,15 @@ impl State {
         false
     }
 
-    fn render(&mut self, duration: Duration) -> Result<(), wgpu::SurfaceError> {
+    fn render(
+        &mut self,
+        duration: Duration,
+        fft: &Arc<Mutex<Vec<f32>>>,
+    ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let layout = self.render_pipeline.get_bind_group_layout(0);
-        self.bind_group = create_bind_group(&self.device, &layout, &self.time_buffer);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -322,20 +339,37 @@ impl State {
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
         sphere_bytes_writer.write(&duration.as_secs_f32()).unwrap();
         self.queue.write_buffer(&self.time_buffer, 0, &bytes);
+        let mut bytes = vec![];
+        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+        let fft_lock = fft.lock().unwrap();
+        sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
+        drop(fft_lock);
+        self.queue.write_buffer(&self.fft_buffer, 0, &bytes);
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())
     }
 }
 
-fn create_bind_group(device: &Device, layout: &BindGroupLayout, time_buffer: &Buffer) -> BindGroup {
+fn create_bind_group(
+    device: &Device,
+    layout: &BindGroupLayout,
+    time_buffer: &Buffer,
+    fft_buffer: &Buffer,
+) -> BindGroup {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: time_buffer.as_entire_binding(),
-        }],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: time_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: fft_buffer.as_entire_binding(),
+            },
+        ],
     });
     bind_group
 }

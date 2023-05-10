@@ -5,6 +5,9 @@ layout (location = 0) in vec2 uv;
 layout (binding  = 0) uniform UniformParameters {
     float time;
 } u;
+layout (binding  = 1) readonly buffer fftBuffer{
+    float v[];
+} fft;
 
 
 #define PI 3.1415926538
