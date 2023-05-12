@@ -1,4 +1,5 @@
 mod audio;
+mod gui;
 mod model;
 mod render_pipeline;
 mod util;
