@@ -1,21 +1,18 @@
 mod audio;
 mod model;
 mod render_pipeline;
+mod renderable;
 mod util;
 
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
-    time::Instant,
 };
 
 use clap::Parser;
-use model::{create_fft_buffer, create_time_buffer, Vertex};
+use renderable::MainDisplay;
 use util::Fps;
-use wgpu::{
-    util::DeviceExt, Backends, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
-    Device, Queue, RenderPass, RenderPipeline, TextureFormat,
-};
+use wgpu::{Backends, BindGroup, BindGroupEntry, BindGroupLayout, Buffer, Device};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -222,150 +219,18 @@ impl State {
     }
 }
 
-struct MainDisplay {
-    pipeline: RenderPipeline,
-    time_start: Instant,
-    fft: Arc<Mutex<Vec<f32>>>,
-    time_buffer: Buffer,
-    fft_buffer: Buffer,
-    vertices: Buffer,
-    bind_group: BindGroup,
-}
-
-impl MainDisplay {
-    fn new(
-        fft: Arc<Mutex<Vec<f32>>>,
-        device: &Device,
-        fragment_shader: &str,
-        format: TextureFormat,
-    ) -> MainDisplay {
-        let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("vertex_shader"),
-            source: wgpu::ShaderSource::Glsl {
-                shader: include_str!("shader.vert").into(),
-                stage: naga::ShaderStage::Vertex,
-                defines: naga::FastHashMap::default(),
-            },
-        });
-        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("fragment_shader"),
-            source: wgpu::ShaderSource::Glsl {
-                shader: fragment_shader.into(),
-                stage: naga::ShaderStage::Fragment,
-                defines: naga::FastHashMap::default(),
-            },
-        });
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform {},
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
-        let time_buffer = create_time_buffer(device, 0.0);
-        let fft_lock = fft.lock().unwrap();
-        let fft_buffer = create_fft_buffer(device, fft_lock.as_slice());
-        drop(fft_lock);
-        let bind_group = create_bind_group(device, &bind_group_layout, &time_buffer, &fft_buffer);
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("render pipeline layout"),
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
-        let vertices = Vertex::square();
-        let mut vertex_bytes = vec![];
-        let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
-        vertex_bytes_writer
-            .write_iter(vertices.iter().cloned())
-            .unwrap();
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("vertex buffer"),
-            contents: &vertex_bytes[..],
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let pipeline = device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
-            &vertex_shader,
-            &fragment_shader,
-            &render_pipeline_layout,
-            &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            &[Vertex::desc()],
-        ));
-        Self {
-            pipeline,
-            time_start: Instant::now(),
-            fft,
-            time_buffer,
-            fft_buffer,
-            vertices: vertex_buffer,
-            bind_group,
-        }
-    }
-
-    fn render<'a, 'b: 'a>(&'b self, render_pass: &mut RenderPass<'a>) {
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_vertex_buffer(0, self.vertices.slice(..));
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.draw(0..6, 0..1);
-    }
-
-    fn update_buffers(&self, queue: &Queue) {
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        sphere_bytes_writer
-            .write(&self.time_start.elapsed().as_secs_f32())
-            .unwrap();
-        queue.write_buffer(&self.time_buffer, 0, &bytes);
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        let fft_lock = self.fft.lock().unwrap();
-        sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
-        drop(fft_lock);
-        queue.write_buffer(&self.fft_buffer, 0, &bytes);
-    }
-}
-
-fn create_bind_group(
-    device: &Device,
-    layout: &BindGroupLayout,
-    time_buffer: &Buffer,
-    fft_buffer: &Buffer,
-) -> BindGroup {
+fn create_bind_group(device: &Device, layout: &BindGroupLayout, buffers: &[&Buffer]) -> BindGroup {
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: time_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: fft_buffer.as_entire_binding(),
-            },
-        ],
+        entries: &buffers
+            .iter()
+            .enumerate()
+            .map(|(i, b)| BindGroupEntry {
+                binding: i as u32,
+                resource: b.as_entire_binding(),
+            })
+            .collect::<Vec<_>>(),
     });
     bind_group
 }
