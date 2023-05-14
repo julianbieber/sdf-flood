@@ -5,12 +5,11 @@ use std::{
 
 use mint::Vector2;
 use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayoutDescriptor, Buffer, Device, Queue, RenderPass,
-    RenderPipeline, TextureFormat,
+    util::DeviceExt, BindGroup, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, Buffer,
+    Device, Queue, RenderPass, RenderPipeline, TextureFormat,
 };
 
 use crate::{
-    create_bind_group,
     model::{create_float_buffer, create_float_vec_buffer, Vertex},
     render_pipeline,
 };
@@ -143,9 +142,13 @@ impl MainDisplay {
 pub struct UIElements {
     pub pipeline: RenderPipeline,
     pub elements: Vec<UIElement>,
+    pub hidden: bool,
 }
 
 impl UIElements {
+    pub fn toggle_hidden(&mut self) {
+        self.hidden = !self.hidden;
+    }
     pub fn new(device: &Device, format: TextureFormat) -> Self {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
@@ -213,10 +216,14 @@ impl UIElements {
                 bind_group,
                 slider_buffer: slider_buffer,
             }],
+            hidden: true,
         }
     }
 
     pub fn render<'a, 'b: 'a>(&'b self, render_pass: &mut RenderPass<'a>) {
+        if self.hidden {
+            return;
+        }
         render_pass.set_pipeline(&self.pipeline);
         for element in self.elements.iter() {
             render_pass.set_vertex_buffer(0, element.vertices.slice(..));
@@ -238,4 +245,20 @@ pub struct UIElement {
     pub vertices: Buffer,
     pub bind_group: BindGroup,
     pub slider_buffer: Buffer,
+}
+
+fn create_bind_group(device: &Device, layout: &BindGroupLayout, buffers: &[&Buffer]) -> BindGroup {
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout,
+        entries: &buffers
+            .iter()
+            .enumerate()
+            .map(|(i, b)| BindGroupEntry {
+                binding: i as u32,
+                resource: b.as_entire_binding(),
+            })
+            .collect::<Vec<_>>(),
+    });
+    bind_group
 }
