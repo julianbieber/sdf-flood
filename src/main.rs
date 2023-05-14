@@ -10,7 +10,7 @@ use std::{
 };
 
 use clap::Parser;
-use renderable::MainDisplay;
+use renderable::{MainDisplay, UIElements};
 use util::Fps;
 use wgpu::{Backends, BindGroup, BindGroupEntry, BindGroupLayout, Buffer, Device};
 use winit::{
@@ -104,6 +104,7 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     main_display: MainDisplay,
+    ui: UIElements,
 }
 
 impl State {
@@ -161,6 +162,7 @@ impl State {
         };
         surface.configure(&device, &config);
         let main_display = MainDisplay::new(fft.clone(), &device, fragment_shader_s, config.format);
+        let ui = UIElements::new(&device, config.format);
 
         Self {
             surface,
@@ -169,6 +171,7 @@ impl State {
             config,
             size,
             main_display,
+            ui,
         }
     }
 
@@ -210,9 +213,11 @@ impl State {
             });
 
             self.main_display.render(&mut render_pass);
+            self.ui.render(&mut render_pass);
         }
 
         self.main_display.update_buffers(&self.queue);
+        self.ui.update_buffers(&self.queue);
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())

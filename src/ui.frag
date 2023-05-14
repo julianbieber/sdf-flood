@@ -3,11 +3,8 @@ layout (location = 0) out vec4 out_color;
   
 layout (location = 0) in vec2 uv;   
 layout (binding  = 0) uniform UniformParameters {
-    float time;
+    float slider;
 } u;
-layout (binding  = 1) readonly buffer fftBuffer{
-    float v[];
-} fft;
 
 
 #define PI 3.1415926538
@@ -16,10 +13,5 @@ layout (binding  = 1) readonly buffer fftBuffer{
 
 
 void main(){
-    int index = int(min(uv.x * 1920.0, 1919.0));
-    if (uv.y <= fft.v[index]) {
-        out_color = vec4(0.0, 1.0, 0.5, 1.0);
-    } else {
-        out_color = vec4(1.0);
-    }
+    out_color = vec4(0.2);
 } 

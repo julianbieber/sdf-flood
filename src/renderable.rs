@@ -3,6 +3,7 @@ use std::{
     time::Instant,
 };
 
+use mint::Vector2;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayoutDescriptor, Buffer, Device, Queue, RenderPass,
     RenderPipeline, TextureFormat,
@@ -83,7 +84,7 @@ impl MainDisplay {
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let vertices = Vertex::square();
+        let vertices = Vertex::rect(Vector2 { x: 0.0, y: 0.0 }, 2.0, 2.0, 0.0);
         let mut vertex_bytes = vec![];
         let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
         vertex_bytes_writer
@@ -175,15 +176,15 @@ impl UIElements {
                 count: None,
             }],
         });
-        let time_buffer = create_float_buffer("slider", device, 0.0);
-        let bind_group = create_bind_group(device, &bind_group_layout, &[&time_buffer]);
+        let slider_buffer = create_float_buffer("slider", device, 0.0);
+        let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let vertices = Vertex::square();
+        let vertices = Vertex::rect(Vector2 { x: 0.0, y: 0.0 }, 0.5, 0.5, 0.1);
         let mut vertex_bytes = vec![];
         let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
         vertex_bytes_writer
@@ -207,7 +208,11 @@ impl UIElements {
         ));
         Self {
             pipeline,
-            elements: todo!(),
+            elements: vec![UIElement {
+                vertices: vertex_buffer,
+                bind_group,
+                slider_buffer: slider_buffer,
+            }],
         }
     }
 

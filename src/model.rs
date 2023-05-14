@@ -20,53 +20,53 @@ impl Vertex {
         }
     }
 
-    pub fn square() -> Vec<Vertex> {
+    pub fn rect(center: mint::Vector2<f32>, width: f32, height: f32, z: f32) -> Vec<Vertex> {
         vec![
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: -1.0,
-                    y: 1.0,
-                    z: 0.0,
+                    x: center.x - width / 2.0,
+                    y: center.y + height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 0.0, y: 1.0 },
             },
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: -1.0,
-                    y: -1.0,
-                    z: 0.0,
+                    x: center.x - width / 2.0,
+                    y: center.y - height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 0.0, y: 0.0 },
             },
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: 1.0,
-                    y: -1.0,
-                    z: 0.0,
+                    x: center.x + width / 2.0,
+                    y: center.y - height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 1.0, y: 0.0 },
             },
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: -1.0,
-                    y: 1.0,
-                    z: 0.0,
+                    x: center.x - width / 2.0,
+                    y: center.y + height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 0.0, y: 1.0 },
             },
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: 1.0,
-                    y: -1.0,
-                    z: 0.0,
+                    x: center.x + width / 2.0,
+                    y: center.y - height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 1.0, y: 0.0 },
             },
             Vertex {
                 position: mint::Vector3::<f32> {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.0,
+                    x: center.x + width / 2.0,
+                    y: center.y + height / 2.0,
+                    z,
                 },
                 pixel: mint::Vector2::<f32> { x: 1.0, y: 1.0 },
             },
