@@ -6,6 +6,9 @@ layout (binding  = 0) uniform float time;
 layout (binding  = 1) readonly buffer fftBuffer{
     float v[];
 } fft;
+layout (binding  = 2) readonly buffer SliderParameters{
+    float v[];
+} sliders;
 
 
 #define ZWEIPIE 6.2831853071

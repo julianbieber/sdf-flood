@@ -20,6 +20,7 @@ pub struct MainDisplay {
     pub fft: Arc<Mutex<Vec<f32>>>,
     pub time_buffer: Buffer,
     pub fft_buffer: Buffer,
+    pub slider_buffer: Buffer,
     pub vertices: Buffer,
     pub bind_group: BindGroup,
 }
@@ -69,14 +70,28 @@ impl MainDisplay {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
         let time_buffer = create_float_buffer("time", device, 0.0);
         let fft_lock = fft.lock().unwrap();
         let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
         drop(fft_lock);
-        let bind_group =
-            create_bind_group(device, &bind_group_layout, &[&time_buffer, &fft_buffer]);
+        let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
+        let bind_group = create_bind_group(
+            device,
+            &bind_group_layout,
+            &[&time_buffer, &fft_buffer, &slider_buffer],
+        );
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
@@ -113,6 +128,7 @@ impl MainDisplay {
             fft_buffer,
             vertices: vertex_buffer,
             bind_group,
+            slider_buffer,
         }
     }
 
@@ -123,7 +139,7 @@ impl MainDisplay {
         render_pass.draw(0..6, 0..1);
     }
 
-    pub fn update_buffers(&self, queue: &Queue) {
+    pub fn update_buffers(&self, queue: &Queue, ui: &UIElements) {
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
         sphere_bytes_writer
@@ -136,6 +152,19 @@ impl MainDisplay {
         sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
         drop(fft_lock);
         queue.write_buffer(&self.fft_buffer, 0, &bytes);
+
+        let mut bytes = vec![];
+        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+        sphere_bytes_writer
+            .write(
+                ui.elements
+                    .iter()
+                    .map(|u| u.value)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap();
+        queue.write_buffer(&self.slider_buffer, 0, &bytes);
     }
 }
 
@@ -143,11 +172,28 @@ pub struct UIElements {
     pub pipeline: RenderPipeline,
     pub elements: Vec<UIElement>,
     pub hidden: bool,
+    pub selected: usize,
 }
 
 impl UIElements {
     pub fn toggle_hidden(&mut self) {
         self.hidden = !self.hidden;
+    }
+    pub fn select(&mut self, s: usize) {
+        if s < self.elements.len() {
+            self.selected = s;
+        }
+    }
+
+    pub fn increment(&mut self) {
+        if !self.hidden {
+            self.elements[self.selected].increment();
+        }
+    }
+    pub fn decrement(&mut self) {
+        if !self.hidden {
+            self.elements[self.selected].decrement();
+        }
     }
     pub fn new(device: &Device, format: TextureFormat) -> Self {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -179,25 +225,12 @@ impl UIElements {
                 count: None,
             }],
         });
-        let slider_buffer = create_float_buffer("slider", device, 0.0);
-        let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render pipeline layout"),
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let vertices = Vertex::rect(Vector2 { x: 0.0, y: 0.0 }, 0.5, 0.5, 0.1);
-        let mut vertex_bytes = vec![];
-        let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
-        vertex_bytes_writer
-            .write_iter(vertices.iter().cloned())
-            .unwrap();
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("vertex buffer"),
-            contents: &vertex_bytes[..],
-            usage: wgpu::BufferUsages::VERTEX,
-        });
         let pipeline = device.create_render_pipeline(&render_pipeline::render_pipeline_descriptor(
             &vertex_shader,
             &fragment_shader,
@@ -209,14 +242,43 @@ impl UIElements {
             })],
             &[Vertex::desc()],
         ));
+
+        let elements: Vec<_> = (0..10)
+            .map(|i| {
+                let slider_buffer = create_float_buffer("slider", device, 0.0);
+                let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
+                let vertices = Vertex::rect(
+                    Vector2 {
+                        x: -0.7,
+                        y: 0.8 - i as f32 / 10.0,
+                    },
+                    0.5,
+                    0.05,
+                    0.1,
+                );
+                let mut vertex_bytes = vec![];
+                let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
+                vertex_bytes_writer
+                    .write_iter(vertices.iter().cloned())
+                    .unwrap();
+                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("vertex buffer"),
+                    contents: &vertex_bytes[..],
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+                UIElement {
+                    vertices: vertex_buffer,
+                    bind_group,
+                    slider_buffer,
+                    value: 0.5,
+                }
+            })
+            .collect();
         Self {
             pipeline,
-            elements: vec![UIElement {
-                vertices: vertex_buffer,
-                bind_group,
-                slider_buffer: slider_buffer,
-            }],
+            elements,
             hidden: true,
+            selected: 0,
         }
     }
 
@@ -236,7 +298,7 @@ impl UIElements {
         for element in self.elements.iter() {
             let mut bytes = vec![];
             let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-            sphere_bytes_writer.write(&0.0_f32).unwrap();
+            sphere_bytes_writer.write(&element.value).unwrap();
             queue.write_buffer(&element.slider_buffer, 0, &bytes);
         }
     }
@@ -245,6 +307,22 @@ pub struct UIElement {
     pub vertices: Buffer,
     pub bind_group: BindGroup,
     pub slider_buffer: Buffer,
+    pub value: f32,
+}
+
+impl UIElement {
+    fn increment(&mut self) {
+        self.value += 0.01;
+        if self.value > 1.0 {
+            self.value = 1.0;
+        }
+    }
+    fn decrement(&mut self) {
+        self.value -= 0.01;
+        if self.value < 0.0 {
+            self.value = 0.0;
+        }
+    }
 }
 
 fn create_bind_group(device: &Device, layout: &BindGroupLayout, buffers: &[&Buffer]) -> BindGroup {

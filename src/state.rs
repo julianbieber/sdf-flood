@@ -120,7 +120,7 @@ impl State {
             self.ui.render(&mut render_pass);
         }
 
-        self.main_display.update_buffers(&self.queue);
+        self.main_display.update_buffers(&self.queue, &self.ui);
         self.ui.update_buffers(&self.queue);
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
@@ -129,6 +129,18 @@ impl State {
     pub fn report_just_pressed(&mut self, key: VirtualKeyCode) {
         match key {
             VirtualKeyCode::M => self.ui.toggle_hidden(),
+            VirtualKeyCode::Key1 => self.ui.select(0),
+            VirtualKeyCode::Key2 => self.ui.select(1),
+            VirtualKeyCode::Key3 => self.ui.select(2),
+            VirtualKeyCode::Key4 => self.ui.select(3),
+            VirtualKeyCode::Key5 => self.ui.select(4),
+            VirtualKeyCode::Key6 => self.ui.select(5),
+            VirtualKeyCode::Key7 => self.ui.select(6),
+            VirtualKeyCode::Key8 => self.ui.select(7),
+            VirtualKeyCode::Key9 => self.ui.select(8),
+            VirtualKeyCode::Key0 => self.ui.select(9),
+            VirtualKeyCode::Up => self.ui.increment(),
+            VirtualKeyCode::Down => self.ui.decrement(),
             _ => (),
         }
     }

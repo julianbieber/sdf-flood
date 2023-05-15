@@ -13,5 +13,9 @@ layout (binding  = 0) uniform UniformParameters {
 
 
 void main(){
-    out_color = vec4(0.2);
+    if (uv.x < u.slider) {
+        out_color = vec4(0.0, 0.0, 1.0, 1.0);
+    } else {
+        out_color = vec4(0.0, 1.0, 0.0, 1.0);
+    }
 } 

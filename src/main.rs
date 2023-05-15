@@ -79,26 +79,21 @@ fn main() {
             WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                 state.resize(**new_inner_size)
             }
-            WindowEvent::KeyboardInput { input, .. } => {
-                // let a = todo!();
-                match input.state {
-                    ElementState::Pressed => {
-                        let just_pressed =
-                            input_state.is_just_pressed(input.virtual_keycode.unwrap());
-                        if just_pressed {
-                            state.report_just_pressed(input.virtual_keycode.unwrap());
-                        }
+            WindowEvent::KeyboardInput { input, .. } => match input.state {
+                ElementState::Pressed => {
+                    let just_pressed = input_state.is_just_pressed(input.virtual_keycode.unwrap());
+                    if just_pressed {
+                        state.report_just_pressed(input.virtual_keycode.unwrap());
                     }
-                    ElementState::Released => input_state.released(input.virtual_keycode.unwrap()),
                 }
-            }
+                ElementState::Released => input_state.released(input.virtual_keycode.unwrap()),
+            },
             WindowEvent::MouseInput { state, .. } => {
                 let pressed = match state {
                     ElementState::Pressed => true,
                     ElementState::Released => false,
                 };
                 dbg!(pressed, &input_state.relative_mouse(&window_mode));
-                ()
             }
             WindowEvent::CursorMoved { position, .. } => {
                 input_state.mouse_position = (position.x, position.y);

@@ -1,4 +1,6 @@
-#version 450 
+# Required shader inputs
+
+```
 layout (location = 0) out vec4 out_color;
   
 layout (location = 0) in vec2 uv;   
@@ -11,18 +13,11 @@ layout (binding  = 1) readonly buffer fftBuffer{
 layout (binding  = 2) readonly buffer SliderParameters{
     float v[];
 } sliders;
+  
+```
 
+# controls 
 
-#define PI 3.1415926538
-#define TAU 6.2831853071
-#define FOV 100
-
-
-void main(){
-    int index = int(min(uv.x * 1920.0, 1919.0));
-    if (uv.y <= fft.v[index]) {
-        out_color = vec4(0.0, 1.0, 0.5, 1.0);
-    } else {
-        out_color = vec4(1.0);
-    }
-} 
+* press "m" to toggle sliders
+* press 1-0 to select slider
+* up/down for increment/decrement slider values (between 0.0 and 1.0 in increments of 0.01)
