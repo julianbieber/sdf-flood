@@ -8,6 +8,9 @@ layout (binding  = 0) uniform UniformParameters {
 layout (binding  = 1) readonly buffer fftBuffer{
     float v[];
 } fft;
+layout (binding  = 2) readonly buffer SliderParameters{
+    float v[];
+} sliders;
 
 
 #define PI 3.1415926538
@@ -121,5 +124,4 @@ void main(){
     vec3 ray_direction = normalize(pixel_position - eye_position); 
 
     out_color = render(eye_position, ray_direction);
-    // out_color = vec4(sin(u.time));
 } 
