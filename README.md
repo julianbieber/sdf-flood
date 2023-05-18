@@ -21,3 +21,4 @@ layout (binding  = 2) readonly buffer SliderParameters{
 * press "m" to toggle sliders
 * press 1-0 to select slider
 * up/down for increment/decrement slider values (between 0.0 and 1.0 in increments of 0.01)
+* mouse click sets slider to value
