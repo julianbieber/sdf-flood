@@ -14,6 +14,52 @@ layout (binding  = 2) readonly buffer SliderParameters{
 #define ZWEIPIE 6.2831853071
 #define FOV 100
 
+const mat2 myt = mat2(.12121212, .13131313, -.13131313, .12121212);
+const vec2 mys = vec2(1e4, 1e6);
+
+vec2 rhash(vec2 uv) {
+    uv *= myt;
+    uv *= mys;
+    return fract(fract(uv / mys) * uv);
+}
+
+vec3 hash(vec3 p) {
+    return fract(
+        sin(vec3(dot(p, vec3(1.0, 57.0, 113.0)), dot(p, vec3(57.0, 113.0, 1.0)),
+                 dot(p, vec3(113.0, 1.0, 57.0)))) *
+        43758.5453);
+}
+
+vec3 voronoi3d( vec3 x) {
+    vec3 p = floor(x);
+    vec3 f = fract(x);
+
+    float id = 0.0;
+    vec2 res = vec2(100.0);
+    for (int k = -1; k <= 1; k++) {
+        for (int j = -1; j <= 1; j++) {
+            for (int i = -1; i <= 1; i++) {
+                vec3 b = vec3(float(i), float(j), float(k));
+                vec3 r = vec3(b) - f + hash(p + b);
+                float d = dot(r, r);
+
+                float cond = max(sign(res.x - d), 0.0);
+                float nCond = 1.0 - cond;
+
+                float cond2 = nCond * max(sign(res.y - d), 0.0);
+                float nCond2 = 1.0 - cond2;
+
+                id = (dot(p + b, vec3(1.0, 57.0, 113.0)) * cond) + (id * nCond);
+                res = vec2(d, res.x) * cond + res * nCond;
+
+                res.y = cond2 * d + nCond2 * res.y;
+            }
+        }
+    }
+
+    return vec3(sqrt(res), abs(id));
+}
+
 vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
 vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
 
@@ -86,8 +132,43 @@ float noise(vec3 v){
                                   dot(p2,x2), dot(p3,x3) ) );
 }
 
+vec3 spermute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+float snoise(vec2 v){
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                        -0.577350269189626, 0.024390243902439);
+    vec2 i  = floor(v + dot(v, C.yy) );
+    vec2 x0 = v -   i + dot(i, C.xx);
+    vec2 i1;
+    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod(i, 289.0);
+    vec3 p = spermute( spermute( i.y + vec3(0.0, i1.y, 1.0 ))
+                      + i.x + vec3(0.0, i1.x, 1.0 ));
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+                            dot(x12.zw,x12.zw)), 0.0);
+    m = m*m ;
+    m = m*m ;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+    vec3 g;
+    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+}
+
 float sphere(vec2 p, vec2 center, float radius) {
     return (radius - length(center - p))/radius;
+}
+
+// return 1 if v inside the box, return 0 otherwise
+float insideBox(vec2 v, vec2 bottomLeft, vec2 topRight) {
+    vec2 s = step(bottomLeft, v) - step(topRight, v);
+    return s.x * s.y;
 }
 
 void main(){
@@ -103,19 +184,24 @@ void main(){
 
     // day animation
 
+    float a = 0.0;
     vec2 pos = uv;
     float forward = abs(sin(time));
     vec4 day_color = day_time_color ;
-    for(float i=5.0;i<8.0;i = i+1.0)
+    for(float i=1.0;i<8.0;i = i+3.0)
     {
         for(float j=0.0;j<40.0;j = j+10.0){
-            forward = abs(sin(0.01*time));
-            day_color = day_color+(uv.y)*noise(vec3(i*uv,j*forward))/(15.0);
+            forward = abs(sin(0.001*time));
+            //day_color = day_color+(uv.y)*noise(vec3(i*uv,j*forward))/(15.0);
+            a += (uv.y)*noise(vec3(i*uv,j*forward))/(8.0);
 
         }
 
     }
 
+    if(a>0.000000000001){
+        day_color += a;
+    }
 
     vec4 night_color = night_background_color;
 
@@ -125,20 +211,72 @@ void main(){
     night_color += clamp(sphere(uv, vec2(0.20,0.49), 0.0012), 0.0,1.0) ;
     night_color += clamp(sphere(uv, vec2(0.1,0.9), 0.0026), 0.0,1.0) ;
 
-
+    //cloud
     forward = abs(sin(time));
     for(float i=5.0;i<8.0;i = i+1.0)
     {
         for(float j=0.0;j<40.0;j = j+15.0){
             forward = abs(sin(0.01*time));
             night_color = night_color+(uv.y)*noise(vec3(i*uv,j*forward))/(80.0);
-
         }
 
     }
+    /*
+    float width = 0.005;
+    float height = 0.3;
+    vec2 start_pos = vec2(0.5,0.0);
+    float ane =(2.0/4.0)*3.14159;//3.14159/2.0 = 45 grad
+    if (tan(ane)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height&&uv.y > start_pos.y){
+        night_color = vec4(0.0);
+    }
+    float ane_minus = ane;
+    float ane_plus = ane;
+    for(int i=0;i<3;++i)
+    {
+
+        start_pos = vec2(start_pos.x+cos(ane)*height*0.9,start_pos.y+sin(ane)*height*0.9);// how to calc this?
+        width = width*0.9;
+        height = height*0.8;
+        for(int j=0;j<5;++j){
+            ane_plus = (0.01*abs(cos(time))+1.0)*ane + j*ane*0.15;
+            ane_minus = (0.01*abs(cos(time))+1.0)*ane - j*ane*0.15;
+            if (tan(ane_minus)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane_minus)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height&&uv.y > start_pos.y){
+                night_color = vec4(0.0);
+            }
+            if (tan(ane_plus)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane_plus)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height&&uv.y > start_pos.y){
+                night_color = vec4(0.0);
+            }
+        }
+        ane -= ane*0.2;
+        if (tan(ane)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height&&uv.y > start_pos.y){
+            night_color = vec4(0.0);
+        }
+
+    }*/
 
 
+    /*float width = 2.0;
+    float height = 0.3;
+    vec2 start_pos = vec2(0.5,0.0);
+    float ane =(0.01/4.0)*3.14159;//3.14159/2.0 = 45 grad
+    if (tan(ane)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height){
+        night_color -= noise(100.0*vec3(uv,1.0))*vec4(1.0,0.0,1.0,1.0);
+        night_color -= noise(100.0*vec3(uv,0.0))*vec4(0.0,1.0,0.0,1.0);
+    }
+    width = 2.0;
+    height = 0.3;
+    start_pos = vec2(0.5,0.1);
+    if (tan(ane)*(uv.x-start_pos.x-width)< uv.y-start_pos.y&&tan(ane)*(uv.x-start_pos.x+width)> uv.y-start_pos.y&&distance(start_pos,uv)<height){
+        night_color += vec4(0.34,0.37,0.29,0.0);
+        //night_color -= noise(100.0*vec3(uv,1.0))*vec4(1.0,0.0,1.0,1.0);
+        night_color -= abs(noise(100.0*vec3(uv,0.0)))*vec4(0.1,0.1,0.1,0.0);
+    }
 
+    if(abs((uv.x-0.5))<0.2*(0.7-uv.y)){
+
+        night_color += vec4(0.05,0.1,0.02,1.0);//abs((uv.x-0.5))/0.2);
+    //night_color -= abs(noise(100.0*vec3(uv,0.0)))*vec4(0.2,0.1,0.2,abs((uv.x-0.5))-0.2);
+    }*/
     out_color = sunset_time*night_color+sun_time*day_color ;
 
 
