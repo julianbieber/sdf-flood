@@ -176,6 +176,16 @@ pub struct UIElements {
 }
 
 impl UIElements {
+    /// (0,0) is the center of the screen
+    /// (-1,-1) is the bottom left corner
+    /// (-1, 1) is the top left corner
+    pub fn click(&mut self, position: (f32, f32)) {
+        if !self.hidden {
+            for slider in self.elements.iter_mut() {
+                slider.try_set(position);
+            }
+        }
+    }
     pub fn toggle_hidden(&mut self) {
         self.hidden = !self.hidden;
     }
@@ -243,6 +253,8 @@ impl UIElements {
             &[Vertex::desc()],
         ));
 
+        let width = 0.5;
+        let height = 0.05;
         let elements: Vec<_> = (0..10)
             .map(|i| {
                 let slider_buffer = create_float_buffer("slider", device, 0.0);
@@ -252,9 +264,9 @@ impl UIElements {
                         x: -0.7,
                         y: 0.8 - i as f32 / 10.0,
                     },
-                    0.5,
-                    0.05,
-                    0.1,
+                    width,
+                    height,
+                    0.001,
                 );
                 let mut vertex_bytes = vec![];
                 let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
@@ -271,6 +283,8 @@ impl UIElements {
                     bind_group,
                     slider_buffer,
                     value: 0.5,
+                    dimensions: (width, height),
+                    center: (-0.7, 0.8 - i as f32 / 10.0),
                 }
             })
             .collect();
@@ -308,6 +322,8 @@ pub struct UIElement {
     pub bind_group: BindGroup,
     pub slider_buffer: Buffer,
     pub value: f32,
+    pub dimensions: (f32, f32),
+    pub center: (f32, f32),
 }
 
 impl UIElement {
@@ -321,6 +337,18 @@ impl UIElement {
         self.value -= 0.01;
         if self.value < 0.0 {
             self.value = 0.0;
+        }
+    }
+
+    fn try_set(&mut self, global_position: (f32, f32)) {
+        if global_position.0 >= self.center.0 - self.dimensions.0 / 2.0
+            && global_position.0 <= self.center.0 + self.dimensions.0 / 2.0
+            && global_position.1 >= self.center.1 - self.dimensions.1 / 2.0
+            && global_position.1 <= self.center.1 + self.dimensions.1 / 2.0
+        {
+            let start = self.center.0 - self.dimensions.0 / 2.0;
+            let length = self.dimensions.0;
+            self.value = (global_position.0 - start) / length
         }
     }
 }

@@ -6,23 +6,21 @@ use winit::{event::VirtualKeyCode, window::Window};
 use crate::renderable::{MainDisplay, UIElements};
 
 pub struct State {
+    render_state: RenderState,
+    main_display: MainDisplay,
+    ui: UIElements,
+}
+
+struct RenderState {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    main_display: MainDisplay,
-    ui: UIElements,
 }
 
-impl State {
-    // Creating some of the wgpu types requires async code
-    pub async fn new(
-        window: &Window,
-        fragment_shader_s: &str,
-        fft: &Arc<Mutex<Vec<f32>>>,
-        srgb: bool,
-    ) -> Self {
+impl RenderState {
+    async fn new(window: &Window, srgb: bool) -> RenderState {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::VULKAN,
@@ -69,30 +67,20 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        let main_display = MainDisplay::new(fft.clone(), &device, fragment_shader_s, config.format);
-        let ui = UIElements::new(&device, config.format);
 
-        Self {
+        RenderState {
             surface,
             device,
             queue,
             config,
             size,
-            main_display,
-            ui,
         }
     }
-
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
-            self.config.width = self.size.width;
-            self.config.height = self.size.height;
-            self.surface.configure(&self.device, &self.config);
-        }
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    fn render(
+        &mut self,
+        main_display: &MainDisplay,
+        ui: &UIElements,
+    ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -116,16 +104,56 @@ impl State {
                 depth_stencil_attachment: None,
             });
 
-            self.main_display.render(&mut render_pass);
-            self.ui.render(&mut render_pass);
+            main_display.render(&mut render_pass);
+            ui.render(&mut render_pass);
         }
 
-        self.main_display.update_buffers(&self.queue, &self.ui);
-        self.ui.update_buffers(&self.queue);
+        main_display.update_buffers(&self.queue, ui);
+        ui.update_buffers(&self.queue);
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())
     }
+}
+
+impl State {
+    // Creating some of the wgpu types requires async code
+    pub async fn new(
+        window: &Window,
+        fragment_shader_s: &str,
+        fft: &Arc<Mutex<Vec<f32>>>,
+        srgb: bool,
+    ) -> Self {
+        let render_state = RenderState::new(window, srgb).await;
+        let main_display = MainDisplay::new(
+            fft.clone(),
+            &render_state.device,
+            fragment_shader_s,
+            render_state.config.format,
+        );
+        let ui = UIElements::new(&render_state.device, render_state.config.format);
+
+        Self {
+            main_display,
+            ui,
+            render_state,
+        }
+    }
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        self.render_state.render(&self.main_display, &self.ui)
+    }
+
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.render_state.size = new_size;
+            self.render_state.config.width = self.render_state.size.width;
+            self.render_state.config.height = self.render_state.size.height;
+            self.render_state
+                .surface
+                .configure(&self.render_state.device, &self.render_state.config);
+        }
+    }
+
     pub fn report_just_pressed(&mut self, key: VirtualKeyCode) {
         match key {
             VirtualKeyCode::M => self.ui.toggle_hidden(),
@@ -143,5 +171,10 @@ impl State {
             VirtualKeyCode::Down => self.ui.decrement(),
             _ => (),
         }
+    }
+
+    pub fn report_click(&mut self, position: (f32, f32)) {
+        self.ui
+            .click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))
     }
 }

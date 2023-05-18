@@ -40,7 +40,6 @@ fn main() {
 
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
 
-    // let mut scene = Scene::new(light_spheres, spheres);
     let event_loop = EventLoop::new();
     let mut video_modes: Vec<_> = event_loop
         .available_monitors()
@@ -59,6 +58,7 @@ fn main() {
     let mut input_state = InputState {
         mouse_position: (0.0, 0.0),
         pressed: HashMap::new(),
+        is_clicked: false,
     };
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
@@ -88,12 +88,13 @@ fn main() {
                 }
                 ElementState::Released => input_state.released(input.virtual_keycode.unwrap()),
             },
-            WindowEvent::MouseInput { state, .. } => {
-                let pressed = match state {
-                    ElementState::Pressed => true,
-                    ElementState::Released => false,
+            WindowEvent::MouseInput {
+                state: click_state, ..
+            } => {
+                match click_state {
+                    ElementState::Pressed => input_state.is_clicked = true,
+                    ElementState::Released => input_state.is_clicked = false,
                 };
-                dbg!(pressed, &input_state.relative_mouse(&window_mode));
             }
             WindowEvent::CursorMoved { position, .. } => {
                 input_state.mouse_position = (position.x, position.y);
@@ -104,6 +105,9 @@ fn main() {
             if opt.fps {
                 fps.presented();
                 dbg!(fps.fps());
+            }
+            if input_state.is_clicked {
+                state.report_click(input_state.relative_mouse(&window_mode));
             }
             match state.render() {
                 Ok(_) => {}
@@ -123,6 +127,7 @@ fn main() {
 struct InputState {
     mouse_position: (f64, f64),
     pressed: HashMap<VirtualKeyCode, bool>,
+    is_clicked: bool,
 }
 
 impl InputState {
@@ -130,7 +135,7 @@ impl InputState {
         let size = window_mode.size();
         (
             self.mouse_position.0 as f32 / size.width as f32,
-            self.mouse_position.1 as f32 / size.height as f32,
+            1.0 - self.mouse_position.1 as f32 / size.height as f32,
         )
     }
 
