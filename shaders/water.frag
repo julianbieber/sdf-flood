@@ -93,7 +93,7 @@ float sdFbm( vec3 p, float d )
 }
 
 float water_layer(vec3 p) {
-    return sdFbm(p + vec3(u.time * 0.1), p.y+2.0);
+    return sdFbm(p + vec3(u.time * 0.1), p.y+(2.0));// * abs(sin(fft.v[int(sliders.v[0])]))/10.0 + 1.0));
 }
 float sky(vec3 p) {
     return p.y - 7.0;
