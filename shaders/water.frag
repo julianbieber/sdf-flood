@@ -93,7 +93,7 @@ float sdFbm( vec3 p, float d )
 }
 
 float water_layer(vec3 p) {
-    return p.y + sdFbm(p, 15.0);
+    return sdFbm(p + vec3(u.time * 0.1), p.y+2.0);
 }
 float sky(vec3 p) {
     return p.y - 7.0;
@@ -139,7 +139,7 @@ vec4 resolve_color(int index, vec3 p) {
         return vec4(1.0, 1.0, 1.0, 1.0);
     }
     if (index == 2) {
-        return vec4(0.0, 0.0, abs(sin(p.y* 10.0) * sin(p.x * 3.0)) + 0.2, 1.0);
+        return vec4(0.0, 0.0, 1.0 -(sin(p.y) + 1.0) / 0.2, 1.0);
     } 
     if (index == 3) {
         return vec4(0.8, 0.1, 1.0, 1.0);
@@ -184,4 +184,5 @@ void main(){
 
     out_color = render(vec3(0.0), ray_direction);
     // out_color = vec4(pixel_position, 0.0, 1.0);
+    // out_color = vec4(sin(sdFbm(vec3(uv * 40.0, 0.0), 7.0)), 0.0, 0.0, 1.0);
 } 
