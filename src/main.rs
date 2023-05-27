@@ -81,12 +81,19 @@ fn main() {
             }
             WindowEvent::KeyboardInput { input, .. } => match input.state {
                 ElementState::Pressed => {
-                    let just_pressed = input_state.is_just_pressed(input.virtual_keycode.unwrap());
-                    if just_pressed {
-                        state.report_just_pressed(input.virtual_keycode.unwrap());
+                    if input.virtual_keycode.is_some() {
+                        let just_pressed =
+                            input_state.is_just_pressed(input.virtual_keycode.unwrap());
+                        if just_pressed {
+                            state.report_just_pressed(input.virtual_keycode.unwrap());
+                        }
                     }
                 }
-                ElementState::Released => input_state.released(input.virtual_keycode.unwrap()),
+                ElementState::Released => {
+                    if input.virtual_keycode.is_some() {
+                        input_state.released(input.virtual_keycode.unwrap())
+                    }
+                }
             },
             WindowEvent::MouseInput {
                 state: click_state, ..
