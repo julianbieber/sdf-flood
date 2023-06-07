@@ -70,14 +70,17 @@ SceneSample combine(SceneSample a, SceneSample b) {
 }
 
 float wobble(vec3 p, float angle) {
-    p -= vec3(0.0, 0.25, 0.0);
-    p = rotate(p, 0.0, 0.0, 0.0);
-    p += vec3(0.0, 0.25, 0.0);
-
-    float x = cos(angle) * 2.0;
-    float z = sin(angle) * 2.0;
-    p -= vec3(x, -1.0, z);
-    float w = sdVerticalCapsule(p, 0.5, 0.5);
+    float x = cos(angle) * 1.7;
+    float z = sin(angle) * 1.7;
+    p -= vec3(x, -0.4, z);
+    float w = sphere(p, vec3(0.0, 0.0, 0.0), 0.5);
+    return w;
+}
+float wobble_cut(vec3 p, float angle) {
+    float x = cos(angle) * 3.3;
+    float z = sin(angle) * 3.3;
+    p -= vec3(x, -0.1, z);
+    float w = sphere(p, vec3(0.0, 0.0, 0.0), 0.8);
     return w;
 }
 
@@ -87,26 +90,29 @@ float ghost(vec3 p) {
 
     for (float i = 0; i < 6.0; ++i) {
         float o = i * TAU / 6.0;
-        float w = wobble(p, o + u.time);
+        float w = wobble(p, o);// + u.time);
         s1 = smin(w, s1, 0.1);
-
     }
 
     p += vec3(0.0, -1.0, 10.0);
     float extension_plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 2.0);
-    s1 = smin(extension_plane, s1, 3.0);
-
-
+    s1 = smin(extension_plane, s1, 5.0);
     
-
-    
+    p -= vec3(0.0, -1.0, 10.0);
+    for (float i = 0; i < 6.0; ++i) {
+        float o = i * TAU / 6.0 + PI / 6.0;
+        float w = wobble_cut(p, o); //+ u.time);
+        float s = smin(s1, w, 0.3);
+        s1 = max(-s, s1);
+    }
+    p += vec3(0.0, -1.0, 10.0);
     s1 = sub(sdPlane(p, vec3(0.0, 1.0, 0.0), 1.5), s1);
     return s1;
 }
 
 float mouth(vec3 p) {
-    float s = sphere(p, vec3(0.0, 0.0, 8.0), 0.3);
-    float smile_subtraction = sphere(p, vec3(0.05, 0.1, 7.9), 0.31);
+    float s = sphere(p, vec3(0.0, 0.0, 7.4), 0.3);
+    float smile_subtraction = sphere(p, vec3(0.04, 0.13, 7.3), 0.32);
     return sub(smile_subtraction, s);
 }
 
