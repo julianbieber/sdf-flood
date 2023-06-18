@@ -79,9 +79,11 @@ float wobble(vec3 p, float angle) {
 float wobble_cut(vec3 p, float angle) {
     float x = cos(angle) * 3.3;
     float z = sin(angle) * 3.3;
-    p -= vec3(x, -0.1, z);
+    p += vec3(x, 0.9, z);
     float w = sphere(p, vec3(0.0, 0.0, 0.0), 0.8);
-    return w;
+    float plane1 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.7);
+    float plane2 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.62);
+    return sub(plane2, smin(w, plane1, 0.3));
 }
 
 float ghost(vec3 p) {
@@ -103,6 +105,7 @@ float ghost(vec3 p) {
         float o = i * TAU / 6.0 + PI / 6.0;
         float w = wobble_cut(p, o); //+ u.time);
         float s = smin(s1, w, 0.3);
+        // return w;
         s1 = max(-s, s1);
     }
     p += vec3(0.0, -1.0, 10.0);
