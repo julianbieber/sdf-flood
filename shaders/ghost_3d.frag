@@ -81,29 +81,30 @@ float wobble_cut(vec3 p, float angle) {
     float z = sin(angle) * 3.3;
     p += vec3(x, 0.9, z);
     float w = sphere(p, vec3(0.0, 0.0, 0.0), 0.8);
-    float plane1 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.7);
-    float plane2 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.62);
-    return sub(plane2, smin(w, plane1, 0.3));
+    float plane1 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.5);
+    // float plane2 = sdPlane(p, vec3(0.0, 1.0, 0.0), -0.62);
+    // return sub(plane2, smin(w, plane1, 0.3));
+    return smin(w, plane1, 0.8);
 }
 
 float ghost(vec3 p) {
     p -= vec3(0.0, -1.0, 10.0);
     float s1 = sdVerticalCapsule(p, 2.0, 2.0);
 
+    float extension_plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 2.0);
+    s1 = smin(extension_plane, s1, 5.0);
     for (float i = 0; i < 6.0; ++i) {
         float o = i * TAU / 6.0;
-        float w = wobble(p, o);// + u.time);
-        s1 = smin(w, s1, 0.1);
+        float w = wobble(p, o + u.time);
+        s1 = smin(w, s1, 0.3);
     }
 
     p += vec3(0.0, -1.0, 10.0);
-    float extension_plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 2.0);
-    s1 = smin(extension_plane, s1, 5.0);
     
     p -= vec3(0.0, -1.0, 10.0);
     for (float i = 0; i < 6.0; ++i) {
         float o = i * TAU / 6.0 + PI / 6.0;
-        float w = wobble_cut(p, o); //+ u.time);
+        float w = wobble_cut(p, o + u.time);
         float s = smin(s1, w, 0.3);
         // return w;
         s1 = max(-s, s1);
