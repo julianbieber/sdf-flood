@@ -33,8 +33,8 @@ struct Opt {
 
 fn main() {
     env_logger::init();
-    let o = Arc::new(Mutex::new(vec![0.0; 1920]));
-    audio::start(o.clone());
+    let o = Arc::new(Mutex::new(vec![0.0; 2048]));
+    let _audio_stream = audio::start(o.clone());
 
     let opt = dbg!(Opt::parse());
 
