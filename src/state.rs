@@ -102,6 +102,8 @@ impl RenderState {
                     },
                 })],
                 depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
             main_display.render(&mut render_pass);
