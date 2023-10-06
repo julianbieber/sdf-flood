@@ -53,14 +53,22 @@ SceneSample combine(SceneSample a, SceneSample b) {
 
 SceneSample scene(vec3 p) {
     vec3 v1 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample a = SceneSample(planeSDF(v1, vec3(0.0, 1.0, 0.0), 1.0), 1);
+    SceneSample a = SceneSample(planeSDF(v1, vec3(0.0, 1.0, 0.0), 0.4), 1);
     vec3 v2 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample b = SceneSample(planeSDF(v2, vec3(0.0, 1.0, 0.0), 1.0), 2);
+    SceneSample b = SceneSample(planeSDF(v2, vec3(0.0, 1.0, 0.0), 0.4), 2);
     vec3 v3 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample c = SceneSample(planeSDF(v3, vec3(0.0, -1.0, 0.0), 1.0), 3);
+    SceneSample c = SceneSample(planeSDF(v3, vec3(0.0, -1.0, 0.0), 0.4), 3);
     vec3 v4 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample d = SceneSample(planeSDF(v4, vec3(0.0, -1.0, 0.0), 1.0), 4);
-    return combine(combine(combine(a, b), c), d);
+    SceneSample d = SceneSample(planeSDF(v4, vec3(0.0, -1.0, 0.0), 0.4), 4);
+    vec3 v5 = rotate(p, cos(u.time), 0.0, 0.0);
+    SceneSample e = SceneSample(planeSDF(v5, vec3(1.0, 0.0, 0.0), 0.4), 5);
+    vec3 v7 = rotate(p, sin(u.time), 0.0, 0.0);
+    SceneSample f = SceneSample(planeSDF(v7, vec3(1.0, 0.0, 0.0), 0.4), 6);
+    vec3 v8 = rotate(p, sin(u.time), 0.0, 0.0);
+    SceneSample g = SceneSample(planeSDF(v8, vec3(-1.0, 0.0, 0.0), 0.4), 7);
+    vec3 v9 = rotate(p, cos(u.time), 0.0, 0.0);
+    SceneSample h = SceneSample(planeSDF(v9, vec3(-1.0, 0.0, 0.0), 0.4), 8);
+    return combine(combine(combine(combine(combine(combine(combine(a, b), c), d), e), f), g), h);
 }
 
 float scene_f(vec3 p) {
@@ -115,15 +123,22 @@ vec4 resolve_color(int index, vec3 p) {
 }
 float hash(vec4 p)  // replace this by something better
 {
-    p  = 50.0*fract( p*0.3183099 + vec4(0.71,0.113,0.419, 0.253));
+    p  = 50.0*fract( p*0.3183099 + vec4(0.71,0.113,0.419, 0.453));
     return -1.0+2.0*fract( p.x*p.y*p.z*p.w*(p.x+p.y+p.z) );
 }
-float noised(vec4 p) {
-    const vec2 e = vec2(0.0, 1.0);
-    vec4 i = floor(p);    // integer
-    vec4 f = fract(p);    // fract
+float noised(vec4 p, float g) {
+
+    float angle = (p.y* 0.1);
+    float c = cos(angle);
+    float s = sin(angle);
+    mat4 rot = mat4(-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, c, -s, 0, 0, s, -c);
+    vec4 rotated_p = p * rot;
     
-    f = f*f*(3. - 2.*f);
+    const vec2 e = vec2(0.0, 1.0);
+    vec4 i = floor(rotated_p);    // integer
+    vec4 f = fract(rotated_p);    // fract
+    
+    f = f*f*(3. - 2.*f*f);
     
     return mix(mix(mix(mix(hash(i + e.xxxx),
                            hash(i + e.yxxx), f.x),
@@ -145,18 +160,18 @@ float noised(vec4 p) {
 
 float fbm(vec4 sample_point, float h) {
     float t = 0.0;
-    for( int i=0; i<8; i++ )
-    {
+    for( int i=0; i<12; i++ ) {
         float f = pow( 2.0, float(i) );
         float a = pow( f, -h );
-        t += a*noised(f*sample_point);
+        t += a*noised(f*sample_point, float(i));
     }
     return t;
-    return 0.0;
 }
 vec4 resolve_color_noise(int index, vec3 p) {
     if (index > 0) {
-        return vec4(1.0, 1.0, 1.0, 1.0) * 1.5 * tan(fbm(vec4(p + vec3(0.0, 0.0, tan(u.time)), u.time), 0.4));
+        return vec4(1.0, 0.0, 0.0, 1.0) *smoothstep(0.0, 1.0, fbm(vec4(p + vec3(0.0, 0.0, (u.time)), u.time), 0.9)) + 
+               vec4(0.0, 0.0, 1.0, 1.0) *smoothstep(0.0, 1.0, fbm(vec4(p + vec3(0.0, 0.0, (u.time + 0.001)), u.time + 0.04), 0.9)) + 
+               vec4(0.0, 1.0, 0.0, 1.0) *smoothstep(0.0, 1.0, fbm(vec4(p + vec3(0.0, 0.0, (u.time + 0.002)), u.time + 0.08), 0.9));
     }
     return vec4(0);
 }
