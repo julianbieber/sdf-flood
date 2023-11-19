@@ -16,8 +16,8 @@ crevice = {version = "0.13.0"}
 mint = "0.5"
 nanorand = "0.7"
 clap = { version = "4.3.21", features = ["derive"] }
-rustfft = "6.1.0"
 cpal = "0.15.2"
+spectrum-analyzer = "1.5.0"
 
 [dependencies.naga]
 git = "https://github.com/gfx-rs/naga"

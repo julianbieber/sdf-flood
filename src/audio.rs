@@ -1,10 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use rustfft::num_complex::Complex32;
-use rustfft::FftPlanner;
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
+use spectrum_analyzer::scaling::scale_to_zero_to_one;
+use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 
 pub fn start(output: Arc<Mutex<Vec<f32>>>) -> Stream {
     let length = output.lock().unwrap().len();
@@ -16,27 +15,38 @@ pub fn start(output: Arc<Mutex<Vec<f32>>>) -> Stream {
     let config = StreamConfig {
         channels: 1,                          // Number of audio channels (e.g., mono or stereo)
         sample_rate: cpal::SampleRate(44100), // Sample rate in Hz
-        buffer_size: cpal::BufferSize::Fixed(length as u32 * 4), // Buffer size
+        buffer_size: cpal::BufferSize::Fixed(length as u32 * 4 * 2), // Buffer size
     };
 
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(length);
-    let scaling = length as f32;
-    let mut complex_buffer = vec![Complex32 { re: 0.0, im: 0.0 }; length];
+    let mut buffer = vec![0.0f32; length * 2];
     let stream = input_device
         .build_input_stream(
             &config,
             move |data: &[i16], _: &_| {
-                for (c, v) in complex_buffer.iter_mut().zip(data.iter()) {
-                    c.re = *v as f32;
-                    c.im = 0.0;
+                for (c, v) in buffer.iter_mut().zip(data.iter()) {
+                    *c = *v as f32;
                 }
-
-                fft.process(&mut complex_buffer);
+                // let hann_window = hann_window(&buffer);
+                let spectrum_hann_window = samples_fft_to_spectrum(
+                    // (windowed) samples
+                    &buffer,
+                    // sampling rate
+                    44100,
+                    // optional frequency limit: e.g. only interested in frequencies 50 <= f <= 150?
+                    FrequencyLimit::All,
+                    // optional scale
+                    Some(&scale_to_zero_to_one),
+                )
+                .unwrap();
                 let mut o = output.lock().unwrap();
-                o.iter_mut().zip(complex_buffer.iter()).for_each(|(o, c)| {
-                    *o = c.l1_norm() / scaling; //.re.sqrt() / scaling;
-                });
+                o.iter_mut()
+                    .zip(spectrum_hann_window.data().iter())
+                    .for_each(|(o, (_, c))| {
+                        if c.val() > 1.0 {
+                            dbg!(c);
+                        }
+                        *o = c.val();
+                    });
                 drop(o);
             },
             |err| eprintln!("Error in audio stream: {:?}", err),
