@@ -53,21 +53,21 @@ SceneSample combine(SceneSample a, SceneSample b) {
 
 SceneSample scene(vec3 p) {
     vec3 v1 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample a = SceneSample(planeSDF(v1, vec3(0.0, 1.0, 0.0), 0.4), 1);
+    SceneSample a = SceneSample(planeSDF(v1, vec3(0.0, 1.0, 0.0), 0.5), 1);
     vec3 v2 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample b = SceneSample(planeSDF(v2, vec3(0.0, 1.0, 0.0), 0.4), 2);
+    SceneSample b = SceneSample(planeSDF(v2, vec3(0.0, 1.0, 0.0), 0.5), 2);
     vec3 v3 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample c = SceneSample(planeSDF(v3, vec3(0.0, -1.0, 0.0), 0.4), 3);
+    SceneSample c = SceneSample(planeSDF(v3, vec3(0.0, -1.0, 0.0), 0.5), 3);
     vec3 v4 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample d = SceneSample(planeSDF(v4, vec3(0.0, -1.0, 0.0), 0.4), 4);
+    SceneSample d = SceneSample(planeSDF(v4, vec3(0.0, -1.0, 0.0), 0.5), 4);
     vec3 v5 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample e = SceneSample(planeSDF(v5, vec3(1.0, 0.0, 0.0), 0.4), 5);
+    SceneSample e = SceneSample(planeSDF(v5, vec3(1.0, 0.0, 0.0), 0.5), 5);
     vec3 v7 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample f = SceneSample(planeSDF(v7, vec3(1.0, 0.0, 0.0), 0.4), 6);
+    SceneSample f = SceneSample(planeSDF(v7, vec3(1.0, 0.0, 0.0), 0.5), 6);
     vec3 v8 = rotate(p, sin(u.time), 0.0, 0.0);
-    SceneSample g = SceneSample(planeSDF(v8, vec3(-1.0, 0.0, 0.0), 0.4), 7);
+    SceneSample g = SceneSample(planeSDF(v8, vec3(-1.0, 0.0, 0.0), 0.5), 7);
     vec3 v9 = rotate(p, cos(u.time), 0.0, 0.0);
-    SceneSample h = SceneSample(planeSDF(v9, vec3(-1.0, 0.0, 0.0), 0.4), 8);
+    SceneSample h = SceneSample(planeSDF(v9, vec3(-1.0, 0.0, 0.0), 0.5), 8);
     return combine(combine(combine(combine(combine(combine(combine(a, b), c), d), e), f), g), h);
 }
 
