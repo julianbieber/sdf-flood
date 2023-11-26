@@ -18,6 +18,7 @@ nanorand = "0.7"
 clap = { version = "4.3.21", features = ["derive"] }
 cpal = "0.15.2"
 spectrum-analyzer = "1.5.0"
+tokio = { version = "1.34.0", features = ["sync"] }
 
 [dependencies.naga]
 git = "https://github.com/gfx-rs/naga"
