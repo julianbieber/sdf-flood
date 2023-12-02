@@ -1,12 +1,18 @@
 use image::{ImageBuffer, Rgba};
 use tokio::sync::oneshot::channel;
 use wgpu::{
-    BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, ImageCopyBuffer,
-    ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Queue, RequestAdapterOptions, Texture,
-    TextureDescriptor, TextureUsages,
+    BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Extent3d,
+    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Queue,
+    RequestAdapterOptions, Texture, TextureUsages,
 };
 
-async fn setup_render_to_file(instance: Instance) {
+pub struct FileRenderSurface {
+    device: Device,
+    texture: Texture,
+    texture_size: Extent3d,
+}
+
+async fn setup_render_to_file(instance: &Instance) {
     let adapter = instance
         .request_adapter(&RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -32,7 +38,7 @@ async fn setup_render_to_file(instance: Instance) {
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8UnormSrgb,
         usage: TextureUsages::COPY_SRC | TextureUsages::RENDER_ATTACHMENT,
-        view_formats: todo!(),
+        view_formats: &[],
     };
 
     let texture = device.create_texture(&tecture_desc);
@@ -42,7 +48,7 @@ async fn setup_render_to_file(instance: Instance) {
 async fn render_to_file(
     devivce: &Device,
     texture: &Texture,
-    texture_size: wgpu::Extent3d,
+    texture_size: Extent3d,
     mut encoder: CommandEncoder,
     queue: &mut Queue,
 ) {

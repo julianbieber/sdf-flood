@@ -1,6 +1,7 @@
 mod audio;
 mod model;
 mod render_pipeline;
+mod render_surface;
 mod render_to_file;
 mod renderable;
 mod state;
