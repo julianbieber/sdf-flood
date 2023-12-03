@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use wgpu::Backends;
+use wgpu::{Backends, Surface};
 use winit::{event::VirtualKeyCode, window::Window};
 
 use crate::renderable::{MainDisplay, UIElements};
@@ -16,11 +16,11 @@ struct RenderState {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
+    // size: winit::dpi::PhysicalSize<u32>,
 }
 
 impl RenderState {
-    async fn new(window: &Window, srgb: bool) -> RenderState {
+    async fn new(surface: Option<Surface>, width: u32, height: u32, srgb: bool) -> RenderState {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::VULKAN,
@@ -73,7 +73,6 @@ impl RenderState {
             device,
             queue,
             config,
-            size,
         }
     }
     fn render(
@@ -121,12 +120,14 @@ impl RenderState {
 impl State {
     // Creating some of the wgpu types requires async code
     pub async fn new(
-        window: &Window,
+        surface: Option<Surface>,
+        width: u32,
+        height: u32,
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
         srgb: bool,
     ) -> Self {
-        let render_state = RenderState::new(window, srgb).await;
+        let render_state = RenderState::new(surface, width, height, srgb).await;
         let main_display = MainDisplay::new(
             fft.clone(),
             &render_state.device,
@@ -147,9 +148,8 @@ impl State {
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.render_state.size = new_size;
-            self.render_state.config.width = self.render_state.size.width;
-            self.render_state.config.height = self.render_state.size.height;
+            self.render_state.config.width = new_size.width;
+            self.render_state.config.height = new_size.height;
             self.render_state
                 .surface
                 .configure(&self.render_state.device, &self.render_state.config);

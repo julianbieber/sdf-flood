@@ -3,7 +3,7 @@ use tokio::sync::oneshot::channel;
 use wgpu::{
     BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Extent3d,
     ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Queue,
-    RequestAdapterOptions, Texture, TextureUsages,
+    RequestAdapterOptions, Texture, TextureDescriptor, TextureFormat, TextureUsages,
 };
 
 pub struct FileRenderSurface {
@@ -36,9 +36,9 @@ async fn setup_render_to_file(instance: &Instance) {
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        format: TextureFormat::Rgba8UnormSrgb,
         usage: TextureUsages::COPY_SRC | TextureUsages::RENDER_ATTACHMENT,
-        view_formats: &[],
+        view_formats: &[TextureFormat::Rgba8UnormSrgb],
     };
 
     let texture = device.create_texture(&tecture_desc);
