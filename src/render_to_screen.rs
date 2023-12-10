@@ -1,5 +1,9 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use wgpu::Backends;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -7,9 +11,14 @@ use winit::{
     window::{Fullscreen, WindowBuilder},
 };
 
-use crate::util::Fps;
+use crate::{state::State, util::Fps};
 
-fn foo() {
+pub fn render_to_screen(
+    show_fps: bool,
+    srgb: bool,
+    fragment_shader: &str,
+    fft: &Arc<Mutex<Vec<f32>>>,
+) {
     let event_loop = EventLoop::new();
     let mut video_modes: Vec<_> = event_loop
         .available_monitors()
@@ -29,6 +38,18 @@ fn foo() {
         pressed: HashMap::new(),
         is_clicked: false,
     };
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: Backends::VULKAN,
+        dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+    });
+    let mut state = pollster::block_on(State::new(
+        Some(unsafe { instance.create_surface(&window).unwrap() }),
+        window.inner_size().width,
+        window.inner_size().height,
+        &fragment_shader,
+        fft,
+        srgb,
+    ));
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             ref event,
@@ -78,7 +99,7 @@ fn foo() {
             _ => {}
         },
         Event::RedrawRequested(window_id) if window_id == window.id() => {
-            if opt.fps {
+            if show_fps {
                 fps.presented();
                 dbg!(fps.fps());
             }

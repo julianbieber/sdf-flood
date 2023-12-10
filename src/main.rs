@@ -9,20 +9,12 @@ mod state;
 mod util;
 
 use std::{
-    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use clap::Parser;
-use state::State;
-use util::Fps;
-use winit::{
-    event::*,
-    event_loop::{ControlFlow, EventLoop},
-    monitor::VideoMode,
-    window::{Fullscreen, WindowBuilder},
-};
+use render_to_screen::render_to_screen;
 
 #[derive(Parser, Debug)]
 struct Opt {
@@ -44,5 +36,8 @@ fn main() {
     let opt = dbg!(Opt::parse());
 
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
-    let mut state = pollster::block_on(State::new(&window, &fragment_shader, &o, opt.srgb));
+    match opt.image_path {
+        Some(_) => todo!(),
+        None => render_to_screen(opt.fps, opt.srgb, &fragment_shader, &o),
+    }
 }

@@ -21,58 +21,60 @@ struct RenderState {
 
 impl RenderState {
     async fn new(surface: Option<Surface>, width: u32, height: u32, srgb: bool) -> RenderState {
-        let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: Backends::VULKAN,
             dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
         });
-        let surface = unsafe { instance.create_surface(window).unwrap() };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 force_fallback_adapter: false,
-                compatible_surface: Some(&surface),
+                compatible_surface: surface.as_ref(),
             })
             .await
             .unwrap();
-        let surface_caps = surface.get_capabilities(&adapter);
-        // Shader code in this tutorial assumes an sRGB surface texture. Using a different
-        // one will result all the colors coming out darker. If you want to support non
-        // sRGB surfaces, you'll need to account for that when drawing to the frame.
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| if srgb { f.is_srgb() } else { !f.is_srgb() })
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
-                },
-                None,
-            )
-            .await
-            .unwrap();
+        match surface {
+            Some(surface) => {
+                let surface_caps = surface.get_capabilities(&adapter);
+                // Shader code in this tutorial assumes an sRGB surface texture. Using a different
+                // one will result all the colors coming out darker. If you want to support non
+                // sRGB surfaces, you'll need to account for that when drawing to the frame.
+                let surface_format = surface_caps
+                    .formats
+                    .iter()
+                    .find(|f| if srgb { f.is_srgb() } else { !f.is_srgb() })
+                    .copied()
+                    .unwrap_or(surface_caps.formats[0]);
+                let (device, queue) = adapter
+                    .request_device(
+                        &wgpu::DeviceDescriptor {
+                            label: None,
+                            features: wgpu::Features::empty(),
+                            limits: wgpu::Limits::default(),
+                        },
+                        None,
+                    )
+                    .await
+                    .unwrap();
 
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Immediate,
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-        };
-        surface.configure(&device, &config);
-
-        RenderState {
-            surface,
-            device,
-            queue,
-            config,
+                let config = wgpu::SurfaceConfiguration {
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    format: surface_format,
+                    width: width,
+                    height: height,
+                    present_mode: wgpu::PresentMode::Immediate,
+                    alpha_mode: surface_caps.alpha_modes[0],
+                    view_formats: vec![],
+                };
+                surface.configure(&device, &config);
+                RenderState {
+                    surface,
+                    device,
+                    queue,
+                    config,
+                }
+            }
+            None => todo!(),
         }
     }
     fn render(
