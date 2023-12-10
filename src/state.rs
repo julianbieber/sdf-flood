@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use wgpu::{Backends, Surface};
+use wgpu::{
+    Backends, BufferAddress, BufferDescriptor, BufferUsages, Extent3d, ImageCopyBuffer,
+    ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureView,
+};
 use winit::{event::VirtualKeyCode, window::Window};
 
 use crate::renderable::{MainDisplay, UIElements};
@@ -20,11 +23,13 @@ struct RenderState {
 }
 
 impl RenderState {
-    async fn new(surface: Option<Surface>, width: u32, height: u32, srgb: bool) -> RenderState {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: Backends::VULKAN,
-            dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
-        });
+    async fn new(
+        instance: Instance,
+        surface: Option<Surface>,
+        width: u32,
+        height: u32,
+        srgb: bool,
+    ) -> RenderState {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -81,11 +86,15 @@ impl RenderState {
         &mut self,
         main_display: &MainDisplay,
         ui: &UIElements,
+        dst: Option<(&Texture, Extent3d)>,
+        dst_texure_view: Option<TextureView>,
     ) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = dst_texure_view.unwrap_or_else(|| {
+            output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default())
+        });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -113,6 +122,37 @@ impl RenderState {
 
         main_display.update_buffers(&self.queue, ui);
         ui.update_buffers(&self.queue);
+        match dst {
+            Some((dst, size)) => {
+                let u32_size = std::mem::size_of::<u32>() as u32;
+                let output_buffer_size = (u32_size * 1920 * 1080) as BufferAddress;
+                let output_buffer_desc = BufferDescriptor {
+                    label: None,
+                    size: output_buffer_size,
+                    usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+                    mapped_at_creation: false,
+                };
+                let output_buffer = self.device.create_buffer(&output_buffer_desc);
+                encoder.copy_texture_to_buffer(
+                    ImageCopyTexture {
+                        texture: &dst,
+                        mip_level: 0,
+                        origin: Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    ImageCopyBuffer {
+                        buffer: &output_buffer,
+                        layout: ImageDataLayout {
+                            offset: 0,
+                            bytes_per_row: Some(u32_size * 1920),
+                            rows_per_image: Some(1080),
+                        },
+                    },
+                    size,
+                );
+            }
+            None => {}
+        }
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
         Ok(())
@@ -122,6 +162,7 @@ impl RenderState {
 impl State {
     // Creating some of the wgpu types requires async code
     pub async fn new(
+        instance: Instance,
         surface: Option<Surface>,
         width: u32,
         height: u32,
@@ -129,7 +170,7 @@ impl State {
         fft: &Arc<Mutex<Vec<f32>>>,
         srgb: bool,
     ) -> Self {
-        let render_state = RenderState::new(surface, width, height, srgb).await;
+        let render_state = RenderState::new(instance, surface, width, height, srgb).await;
         let main_display = MainDisplay::new(
             fft.clone(),
             &render_state.device,
@@ -144,8 +185,13 @@ impl State {
             render_state,
         }
     }
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.render_state.render(&self.main_display, &self.ui)
+    pub fn render(
+        &mut self,
+        dst: Option<(&Texture, Extent3d)>,
+        dst_texure_view: Option<TextureView>,
+    ) -> Result<(), wgpu::SurfaceError> {
+        self.render_state
+            .render(&self.main_display, &self.ui, dst, dst_texure_view)
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {

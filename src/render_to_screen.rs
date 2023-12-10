@@ -42,8 +42,10 @@ pub fn render_to_screen(
         backends: Backends::VULKAN,
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
     });
+    let surface = Some(unsafe { instance.create_surface(&window).unwrap() });
     let mut state = pollster::block_on(State::new(
-        Some(unsafe { instance.create_surface(&window).unwrap() }),
+        instance,
+        surface,
         window.inner_size().width,
         window.inner_size().height,
         &fragment_shader,
@@ -106,7 +108,7 @@ pub fn render_to_screen(
             if input_state.is_clicked {
                 state.report_click(input_state.relative_mouse(&window_mode));
             }
-            match state.render() {
+            match state.render(None, None) {
                 Ok(_) => {}
                 // Err(wgpu::SurfaceError::Lost) => state.resize(todo!()),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,

@@ -1,10 +1,14 @@
+use std::sync::{Arc, Mutex};
+
 use image::{ImageBuffer, Rgba};
 use tokio::sync::oneshot::channel;
 use wgpu::{
-    BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Extent3d,
+    Backends, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Extent3d,
     ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Queue,
     RequestAdapterOptions, Texture, TextureDescriptor, TextureFormat, TextureUsages,
 };
+
+use crate::state::State;
 
 pub struct FileRenderSurface {
     device: Device,
@@ -12,7 +16,12 @@ pub struct FileRenderSurface {
     texture_size: Extent3d,
 }
 
-async fn setup_render_to_file(instance: &Instance) {
+async fn render_to_file(
+    instance: &Instance,
+    srgb: bool,
+    fragment_shader: &str,
+    fft: &Arc<Mutex<Vec<f32>>>,
+) {
     let adapter = instance
         .request_adapter(&RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -43,9 +52,28 @@ async fn setup_render_to_file(instance: &Instance) {
 
     let texture = device.create_texture(&tecture_desc);
     let texture_view = texture.create_view(&Default::default());
+
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: Backends::VULKAN,
+        dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+    });
+    let mut state = State::new(instance, None, 1920, 1080, fragment_shader, fft, srgb).await;
+    state
+        .render(
+            Some((
+                &texture,
+                wgpu::Extent3d {
+                    width: 1920,
+                    height: 1080,
+                    depth_or_array_layers: 1,
+                },
+            )),
+            Some(texture_view),
+        )
+        .unwrap();
 }
 
-async fn render_to_file(
+async fn foo(
     devivce: &Device,
     texture: &Texture,
     texture_size: Extent3d,
