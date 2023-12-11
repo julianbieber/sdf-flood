@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use wgpu::{
-    Backends, BufferAddress, BufferDescriptor, BufferUsages, Extent3d, ImageCopyBuffer,
-    ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureView,
+    BufferAddress, BufferDescriptor, BufferUsages, Extent3d, ImageCopyBuffer, ImageCopyTexture,
+    ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureView,
 };
-use winit::{event::VirtualKeyCode, window::Window};
+use winit::event::VirtualKeyCode;
 
 use crate::renderable::{MainDisplay, UIElements};
 
@@ -15,10 +15,10 @@ pub struct State {
 }
 
 struct RenderState {
-    surface: wgpu::Surface,
+    surface: Option<wgpu::Surface>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    config: Option<wgpu::SurfaceConfiguration>,
     // size: winit::dpi::PhysicalSize<u32>,
 }
 
@@ -73,13 +73,24 @@ impl RenderState {
                 };
                 surface.configure(&device, &config);
                 RenderState {
-                    surface,
+                    surface: Some(surface),
                     device,
                     queue,
-                    config,
+                    config: Some(config),
                 }
             }
-            None => todo!(),
+            None => {
+                let (device, queue) = adapter
+                    .request_device(&Default::default(), None)
+                    .await
+                    .unwrap();
+                RenderState {
+                    surface: None,
+                    device,
+                    queue,
+                    config: None,
+                }
+            }
         }
     }
     fn render(
@@ -89,12 +100,15 @@ impl RenderState {
         dst: Option<(&Texture, Extent3d)>,
         dst_texure_view: Option<TextureView>,
     ) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = dst_texure_view.unwrap_or_else(|| {
-            output
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default())
-        });
+        let output = self.surface.map(|s| s.get_current_texture().unwrap());
+        let view = dst_texure_view
+            .ok_or_else(|| {
+                output
+                    .unwrap()
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default())
+            })
+            .unwrap();
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -154,7 +168,7 @@ impl RenderState {
             None => {}
         }
         self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
+        output.map(|o| o.present());
         Ok(())
     }
 }

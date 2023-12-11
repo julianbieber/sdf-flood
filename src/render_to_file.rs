@@ -16,12 +16,11 @@ pub struct FileRenderSurface {
     texture_size: Extent3d,
 }
 
-async fn render_to_file(
-    instance: &Instance,
-    srgb: bool,
-    fragment_shader: &str,
-    fft: &Arc<Mutex<Vec<f32>>>,
-) {
+pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<Vec<f32>>>) {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: Backends::VULKAN,
+        dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+    });
     let adapter = instance
         .request_adapter(&RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
