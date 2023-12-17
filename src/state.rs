@@ -1,8 +1,11 @@
 use std::sync::{Arc, Mutex};
 
+use image::{ImageBuffer, Rgba};
+use tokio::sync::oneshot::channel;
 use wgpu::{
     BufferAddress, BufferDescriptor, BufferUsages, Extent3d, ImageCopyBuffer, ImageCopyTexture,
-    ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureView,
+    ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureFormat, TextureUsages,
+    TextureView,
 };
 use winit::event::VirtualKeyCode;
 
@@ -14,12 +17,17 @@ pub struct State {
     ui: UIElements,
 }
 
+enum SurfaceTypes {
+    Window(wgpu::Surface),
+    File(),
+}
+
 struct RenderState {
-    surface: Option<wgpu::Surface>,
+    surface: SurfaceTypes,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: Option<wgpu::SurfaceConfiguration>,
-    // size: winit::dpi::PhysicalSize<u32>,
+    format: TextureFormat, // size: winit::dpi::PhysicalSize<u32>,
 }
 
 impl RenderState {
@@ -29,7 +37,8 @@ impl RenderState {
         width: u32,
         height: u32,
         srgb: bool,
-    ) -> RenderState {
+        format: Option<TextureFormat>,
+    ) -> (RenderState, Option<TextureView>, Option<Texture>) {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -53,7 +62,7 @@ impl RenderState {
                 let (device, queue) = adapter
                     .request_device(
                         &wgpu::DeviceDescriptor {
-                            label: None,
+                            label: Some("device"),
                             features: wgpu::Features::empty(),
                             limits: wgpu::Limits::default(),
                         },
@@ -65,31 +74,66 @@ impl RenderState {
                 let config = wgpu::SurfaceConfiguration {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     format: surface_format,
-                    width: width,
-                    height: height,
+                    width,
+                    height,
                     present_mode: wgpu::PresentMode::Immediate,
                     alpha_mode: surface_caps.alpha_modes[0],
                     view_formats: vec![],
                 };
                 surface.configure(&device, &config);
-                RenderState {
-                    surface: Some(surface),
-                    device,
-                    queue,
-                    config: Some(config),
-                }
+                (
+                    RenderState {
+                        surface: SurfaceTypes::Window(surface),
+                        device,
+                        queue,
+                        config: Some(config),
+                        format: surface_format,
+                    },
+                    None,
+                    None,
+                )
             }
             None => {
                 let (device, queue) = adapter
                     .request_device(&Default::default(), None)
                     .await
                     .unwrap();
-                RenderState {
-                    surface: None,
-                    device,
-                    queue,
-                    config: None,
-                }
+                let tecture_desc = wgpu::TextureDescriptor {
+                    label: Some("output texture"),
+                    size: wgpu::Extent3d {
+                        width: 1920,
+                        height: 1080,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: TextureFormat::Rgba8UnormSrgb,
+                    usage: TextureUsages::COPY_SRC | TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[TextureFormat::Rgba8UnormSrgb],
+                };
+
+                let texture = device.create_texture(&tecture_desc);
+                //  Some((
+                //     &texture,
+                //     wgpu::Extent3d {
+                //         width: 1920,
+                //         height: 1080,
+                //         depth_or_array_layers: 1,
+                //     },
+                // ))
+                let texture_view = texture.create_view(&Default::default());
+                (
+                    RenderState {
+                        surface: SurfaceTypes::File(),
+                        device,
+                        queue,
+                        config: None,
+                        format: format.unwrap(),
+                    },
+                    Some(texture_view),
+                    Some(texture),
+                )
             }
         }
     }
@@ -97,18 +141,21 @@ impl RenderState {
         &mut self,
         main_display: &MainDisplay,
         ui: &UIElements,
-        dst: Option<(&Texture, Extent3d)>,
-        dst_texure_view: Option<TextureView>,
+        file_render_view: Option<TextureView>,
+        file_render_texture: Option<Texture>,
     ) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.map(|s| s.get_current_texture().unwrap());
-        let view = dst_texure_view
-            .ok_or_else(|| {
-                output
-                    .unwrap()
+        let (output, view) = match &self.surface {
+            SurfaceTypes::Window(s) => {
+                let o = s.get_current_texture()?;
+                let v = o
                     .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default())
-            })
-            .unwrap();
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                (Some(o), v)
+            }
+            SurfaceTypes::File() => (None, file_render_view.unwrap()),
+        };
+        // .as_ref()
+        // .map(|s| s.get_current_texture().unwrap());
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -136,12 +183,13 @@ impl RenderState {
 
         main_display.update_buffers(&self.queue, ui);
         ui.update_buffers(&self.queue);
-        match dst {
-            Some((dst, size)) => {
+        let ob = match &self.surface {
+            SurfaceTypes::Window(_) => None,
+            SurfaceTypes::File() => {
                 let u32_size = std::mem::size_of::<u32>() as u32;
                 let output_buffer_size = (u32_size * 1920 * 1080) as BufferAddress;
                 let output_buffer_desc = BufferDescriptor {
-                    label: None,
+                    label: Some("abc"),
                     size: output_buffer_size,
                     usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
                     mapped_at_creation: false,
@@ -149,7 +197,7 @@ impl RenderState {
                 let output_buffer = self.device.create_buffer(&output_buffer_desc);
                 encoder.copy_texture_to_buffer(
                     ImageCopyTexture {
-                        texture: &dst,
+                        texture: &file_render_texture.unwrap(),
                         mip_level: 0,
                         origin: Origin3d::ZERO,
                         aspect: wgpu::TextureAspect::All,
@@ -162,13 +210,32 @@ impl RenderState {
                             rows_per_image: Some(1080),
                         },
                     },
-                    size,
+                    wgpu::Extent3d {
+                        width: 1920,
+                        height: 1080,
+                        depth_or_array_layers: 1,
+                    },
                 );
-            }
-            None => {}
-        }
+                Some(output_buffer)
+            } // None => {}
+        };
         self.queue.submit(std::iter::once(encoder.finish()));
-        output.map(|o| o.present());
+        match &self.surface {
+            SurfaceTypes::Window(s) => output.unwrap().present(),
+            SurfaceTypes::File() => {
+                let buffer_slice = ob.as_ref().unwrap().slice(..);
+                let (tx, rx) = channel();
+                buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+                    tx.send(result).unwrap();
+                });
+                self.device.poll(wgpu::MaintainBase::Wait);
+                pollster::block_on(async { rx.await.unwrap().unwrap() });
+                let data = buffer_slice.get_mapped_range();
+                let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(1920, 1080, data).unwrap();
+                buffer.save("screen.png").unwrap();
+            }
+        }
+        // output.map(|o| o.present());
         Ok(())
     }
 }
@@ -178,43 +245,54 @@ impl State {
     pub async fn new(
         instance: Instance,
         surface: Option<Surface>,
+        format: Option<TextureFormat>,
         width: u32,
         height: u32,
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
         srgb: bool,
-    ) -> Self {
-        let render_state = RenderState::new(instance, surface, width, height, srgb).await;
+    ) -> (Self, Option<TextureView>, Option<Texture>) {
+        let (render_state, file_info, f) =
+            RenderState::new(instance, surface, width, height, srgb, format).await;
         let main_display = MainDisplay::new(
             fft.clone(),
             &render_state.device,
             fragment_shader_s,
-            render_state.config.format,
+            render_state.format,
         );
-        let ui = UIElements::new(&render_state.device, render_state.config.format);
+        let ui = UIElements::new(&render_state.device, render_state.format);
 
-        Self {
-            main_display,
-            ui,
-            render_state,
-        }
+        (
+            Self {
+                main_display,
+                ui,
+                render_state,
+            },
+            file_info,
+            f,
+        )
     }
     pub fn render(
         &mut self,
-        dst: Option<(&Texture, Extent3d)>,
-        dst_texure_view: Option<TextureView>,
+        file_render_view: Option<TextureView>,
+        file_render_texture: Option<Texture>,
     ) -> Result<(), wgpu::SurfaceError> {
-        self.render_state
-            .render(&self.main_display, &self.ui, dst, dst_texure_view)
+        self.render_state.render(
+            &self.main_display,
+            &self.ui,
+            file_render_view,
+            file_render_texture,
+        )
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.render_state.config.width = new_size.width;
-            self.render_state.config.height = new_size.height;
-            self.render_state
-                .surface
-                .configure(&self.render_state.device, &self.render_state.config);
+            if let SurfaceTypes::Window(s) = &self.render_state.surface {
+                s.configure(
+                    &self.render_state.device,
+                    &self.render_state.config.as_ref().unwrap(),
+                );
+            }
         }
     }
 

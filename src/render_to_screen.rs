@@ -43,9 +43,10 @@ pub fn render_to_screen(
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
     });
     let surface = Some(unsafe { instance.create_surface(&window).unwrap() });
-    let mut state = pollster::block_on(State::new(
+    let (mut state, f, t) = pollster::block_on(State::new(
         instance,
         surface,
+        None,
         window.inner_size().width,
         window.inner_size().height,
         &fragment_shader,
