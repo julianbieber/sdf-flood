@@ -1,10 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use wgpu::{
-    Backends, BufferAddress, BufferDescriptor, BufferUsages, CommandEncoder, Device, Extent3d,
-    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Instance, Origin3d, Queue,
-    RequestAdapterOptions, Texture, TextureDescriptor, TextureFormat, TextureUsages,
-};
+use wgpu::{Backends, Device, Extent3d, InstanceFlags, Texture, TextureFormat};
 
 use crate::state::State;
 
@@ -18,6 +14,8 @@ pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<V
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: Backends::VULKAN,
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+        flags: InstanceFlags::debugging(),
+        gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
     });
     let (mut state, f, t) = State::new(
         instance,

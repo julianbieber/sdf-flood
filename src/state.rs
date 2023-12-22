@@ -3,42 +3,42 @@ use std::sync::{Arc, Mutex};
 use image::{ImageBuffer, Rgba};
 use tokio::sync::oneshot::channel;
 use wgpu::{
-    BufferAddress, BufferDescriptor, BufferUsages, Extent3d, ImageCopyBuffer, ImageCopyTexture,
+    BufferAddress, BufferDescriptor, BufferUsages, ImageCopyBuffer, ImageCopyTexture,
     ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureFormat, TextureUsages,
     TextureView,
 };
-use winit::event::VirtualKeyCode;
+use winit::keyboard::Key;
 
 use crate::renderable::{MainDisplay, UIElements};
 
-pub struct State {
-    render_state: RenderState,
+pub struct State<'a> {
+    render_state: RenderState<'a>,
     main_display: MainDisplay,
     ui: UIElements,
 }
 
-enum SurfaceTypes {
-    Window(wgpu::Surface),
+enum SurfaceTypes<'a> {
+    Window(wgpu::Surface<'a>),
     File(),
 }
 
-struct RenderState {
-    surface: SurfaceTypes,
+struct RenderState<'a> {
+    surface: SurfaceTypes<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: Option<wgpu::SurfaceConfiguration>,
     format: TextureFormat, // size: winit::dpi::PhysicalSize<u32>,
 }
 
-impl RenderState {
+impl<'a> RenderState<'a> {
     async fn new(
         instance: Instance,
-        surface: Option<Surface>,
+        surface: Option<Surface<'a>>,
         width: u32,
         height: u32,
         srgb: bool,
         format: Option<TextureFormat>,
-    ) -> (RenderState, Option<TextureView>, Option<Texture>) {
+    ) -> (RenderState<'a>, Option<TextureView>, Option<Texture>) {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -63,8 +63,8 @@ impl RenderState {
                     .request_device(
                         &wgpu::DeviceDescriptor {
                             label: Some("device"),
-                            features: wgpu::Features::empty(),
-                            limits: wgpu::Limits::default(),
+                            required_features: wgpu::Features::empty(),
+                            required_limits: wgpu::Limits::default(),
                         },
                         None,
                     )
@@ -169,7 +169,7 @@ impl RenderState {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
@@ -221,7 +221,7 @@ impl RenderState {
         };
         self.queue.submit(std::iter::once(encoder.finish()));
         match &self.surface {
-            SurfaceTypes::Window(s) => output.unwrap().present(),
+            SurfaceTypes::Window(_s) => output.unwrap().present(),
             SurfaceTypes::File() => {
                 let buffer_slice = ob.as_ref().unwrap().slice(..);
                 let (tx, rx) = channel();
@@ -240,11 +240,11 @@ impl RenderState {
     }
 }
 
-impl State {
+impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
     pub async fn new(
         instance: Instance,
-        surface: Option<Surface>,
+        surface: Option<Surface<'a>>,
         format: Option<TextureFormat>,
         width: u32,
         height: u32,
@@ -296,21 +296,21 @@ impl State {
         }
     }
 
-    pub fn report_just_pressed(&mut self, key: VirtualKeyCode) {
+    pub fn report_just_pressed(&mut self, key: Key) {
         match key {
-            VirtualKeyCode::M => self.ui.toggle_hidden(),
-            VirtualKeyCode::Key1 => self.ui.select(0),
-            VirtualKeyCode::Key2 => self.ui.select(1),
-            VirtualKeyCode::Key3 => self.ui.select(2),
-            VirtualKeyCode::Key4 => self.ui.select(3),
-            VirtualKeyCode::Key5 => self.ui.select(4),
-            VirtualKeyCode::Key6 => self.ui.select(5),
-            VirtualKeyCode::Key7 => self.ui.select(6),
-            VirtualKeyCode::Key8 => self.ui.select(7),
-            VirtualKeyCode::Key9 => self.ui.select(8),
-            VirtualKeyCode::Key0 => self.ui.select(9),
-            VirtualKeyCode::Up => self.ui.increment(),
-            VirtualKeyCode::Down => self.ui.decrement(),
+            // VirtualKeyCode::M => self.ui.toggle_hidden(),
+            // VirtualKeyCode::Key1 => self.ui.select(0),
+            // VirtualKeyCode::Key2 => self.ui.select(1),
+            // VirtualKeyCode::Key3 => self.ui.select(2),
+            // VirtualKeyCode::Key4 => self.ui.select(3),
+            // VirtualKeyCode::Key5 => self.ui.select(4),
+            // VirtualKeyCode::Key6 => self.ui.select(5),
+            // VirtualKeyCode::Key7 => self.ui.select(6),
+            // VirtualKeyCode::Key8 => self.ui.select(7),
+            // VirtualKeyCode::Key9 => self.ui.select(8),
+            // VirtualKeyCode::Key0 => self.ui.select(9),
+            // VirtualKeyCode::Up => self.ui.increment(),
+            // VirtualKeyCode::Down => self.ui.decrement(),
             _ => (),
         }
     }

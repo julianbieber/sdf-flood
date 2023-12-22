@@ -7,10 +7,10 @@ edition = "2021"
 
 [dependencies]
 image = "0.24"
-winit = "0.28"
+winit = "0.29"
 env_logger = "0.10"
 log = "0.4"
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "07f92c9", features = ["glsl"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "79e5169", features = ["glsl"] }
 pollster = "0.3"
 crevice = {version = "0.13.0"}
 mint = "0.5"
@@ -23,6 +23,6 @@ async-trait = "0.1.74"
 
 [dependencies.naga]
 git = "https://github.com/gfx-rs/naga"
-rev = "bac2d82a430fbfcf100ee22b7c3bc12f3d593079"
-version = "0.13.0"
+rev = "d0f28c0"
+version = "0.14.0"
 features = ["clone"]
