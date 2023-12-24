@@ -35,16 +35,16 @@ impl MainDisplay {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
                 shader: include_str!("shader.vert").into(),
-                stage: naga::ShaderStage::Vertex,
-                defines: naga::FastHashMap::default(),
+                stage: wgpu::naga::ShaderStage::Vertex,
+                defines: wgpu::naga::FastHashMap::default(),
             },
         });
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("fragment_shader"),
             source: wgpu::ShaderSource::Glsl {
                 shader: fragment_shader.into(),
-                stage: naga::ShaderStage::Fragment,
-                defines: naga::FastHashMap::default(),
+                stage: wgpu::naga::ShaderStage::Fragment,
+                defines: wgpu::naga::FastHashMap::default(),
             },
         });
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -210,16 +210,16 @@ impl UIElements {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
                 shader: include_str!("ui.vert").into(),
-                stage: naga::ShaderStage::Vertex,
-                defines: naga::FastHashMap::default(),
+                stage: wgpu::naga::ShaderStage::Vertex,
+                defines: wgpu::naga::FastHashMap::default(),
             },
         });
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("fragment_shader"),
             source: wgpu::ShaderSource::Glsl {
                 shader: include_str!("ui.frag").into(),
-                stage: naga::ShaderStage::Fragment,
-                defines: naga::FastHashMap::default(),
+                stage: wgpu::naga::ShaderStage::Fragment,
+                defines: wgpu::naga::FastHashMap::default(),
             },
         });
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
