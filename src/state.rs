@@ -7,7 +7,7 @@ use wgpu::{
     ImageDataLayout, Instance, Origin3d, Surface, Texture, TextureFormat, TextureUsages,
     TextureView,
 };
-use winit::keyboard::Key;
+use winit::keyboard::{Key, NamedKey};
 
 use crate::renderable::{MainDisplay, UIElements};
 
@@ -30,12 +30,17 @@ struct RenderState<'a> {
     format: TextureFormat, // size: winit::dpi::PhysicalSize<u32>,
 }
 
+#[derive(Clone, Copy)]
+pub struct WindowSize {
+    pub width: u32,
+    pub height: u32,
+}
+
 impl<'a> RenderState<'a> {
     async fn new(
         instance: Instance,
         surface: Option<Surface<'a>>,
-        width: u32,
-        height: u32,
+        size: WindowSize,
         srgb: bool,
         format: Option<TextureFormat>,
     ) -> (RenderState<'a>, Option<TextureView>, Option<Texture>) {
@@ -74,9 +79,9 @@ impl<'a> RenderState<'a> {
                 let config = wgpu::SurfaceConfiguration {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     format: surface_format,
-                    width,
-                    height,
-                    present_mode: wgpu::PresentMode::Immediate,
+                    width: size.width,
+                    height: size.height,
+                    present_mode: wgpu::PresentMode::Fifo,
                     alpha_mode: surface_caps.alpha_modes[0],
                     view_formats: vec![],
                 };
@@ -221,7 +226,9 @@ impl<'a> RenderState<'a> {
         };
         self.queue.submit(std::iter::once(encoder.finish()));
         match &self.surface {
-            SurfaceTypes::Window(_s) => output.unwrap().present(),
+            SurfaceTypes::Window(_s) => {
+                output.unwrap().present();
+            }
             SurfaceTypes::File() => {
                 let buffer_slice = ob.as_ref().unwrap().slice(..);
                 let (tx, rx) = channel();
@@ -246,14 +253,13 @@ impl<'a> State<'a> {
         instance: Instance,
         surface: Option<Surface<'a>>,
         format: Option<TextureFormat>,
-        width: u32,
-        height: u32,
+        size: WindowSize,
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
         srgb: bool,
     ) -> (Self, Option<TextureView>, Option<Texture>) {
         let (render_state, file_info, f) =
-            RenderState::new(instance, surface, width, height, srgb, format).await;
+            RenderState::new(instance, surface, size, srgb, format).await;
         let main_display = MainDisplay::new(
             fft.clone(),
             &render_state.device,
@@ -290,7 +296,7 @@ impl<'a> State<'a> {
             if let SurfaceTypes::Window(s) = &self.render_state.surface {
                 s.configure(
                     &self.render_state.device,
-                    &self.render_state.config.as_ref().unwrap(),
+                    self.render_state.config.as_ref().unwrap(),
                 );
             }
         }
@@ -298,19 +304,19 @@ impl<'a> State<'a> {
 
     pub fn report_just_pressed(&mut self, key: Key) {
         match key {
-            // VirtualKeyCode::M => self.ui.toggle_hidden(),
-            // VirtualKeyCode::Key1 => self.ui.select(0),
-            // VirtualKeyCode::Key2 => self.ui.select(1),
-            // VirtualKeyCode::Key3 => self.ui.select(2),
-            // VirtualKeyCode::Key4 => self.ui.select(3),
-            // VirtualKeyCode::Key5 => self.ui.select(4),
-            // VirtualKeyCode::Key6 => self.ui.select(5),
-            // VirtualKeyCode::Key7 => self.ui.select(6),
-            // VirtualKeyCode::Key8 => self.ui.select(7),
-            // VirtualKeyCode::Key9 => self.ui.select(8),
-            // VirtualKeyCode::Key0 => self.ui.select(9),
-            // VirtualKeyCode::Up => self.ui.increment(),
-            // VirtualKeyCode::Down => self.ui.decrement(),
+            Key::Character(s) if s == "m" => self.ui.toggle_hidden(),
+            Key::Character(s) if s == "0" => self.ui.select(0),
+            Key::Character(s) if s == "1" => self.ui.select(1),
+            Key::Character(s) if s == "2" => self.ui.select(2),
+            Key::Character(s) if s == "3" => self.ui.select(3),
+            Key::Character(s) if s == "4" => self.ui.select(4),
+            Key::Character(s) if s == "5" => self.ui.select(5),
+            Key::Character(s) if s == "6" => self.ui.select(6),
+            Key::Character(s) if s == "7" => self.ui.select(7),
+            Key::Character(s) if s == "8" => self.ui.select(8),
+            Key::Character(s) if s == "9" => self.ui.select(9),
+            Key::Named(NamedKey::ArrowUp) => self.ui.increment(),
+            Key::Named(NamedKey::ArrowDown) => self.ui.decrement(),
             _ => (),
         }
     }

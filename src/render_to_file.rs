@@ -1,14 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use wgpu::{Backends, Device, Extent3d, InstanceFlags, Texture, TextureFormat};
+use wgpu::{Backends, InstanceFlags, TextureFormat};
 
-use crate::state::State;
-
-pub struct FileRenderSurface {
-    device: Device,
-    texture: Texture,
-    texture_size: Extent3d,
-}
+use crate::state::{State, WindowSize};
 
 pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<Vec<f32>>>) {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -21,8 +15,10 @@ pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<V
         instance,
         None,
         Some(TextureFormat::Rgba8UnormSrgb),
-        1920,
-        1080,
+        WindowSize {
+            width: 1920,
+            height: 1080,
+        },
         fragment_shader,
         fft,
         srgb,

@@ -42,9 +42,6 @@ pub fn start(output: Arc<Mutex<Vec<f32>>>) -> Stream {
                 o.iter_mut()
                     .zip(spectrum_hann_window.data().iter())
                     .for_each(|(o, (_, c))| {
-                        if c.val() > 1.0 {
-                            dbg!(c);
-                        }
                         *o = c.val();
                     });
                 drop(o);
