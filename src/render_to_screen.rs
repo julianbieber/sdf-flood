@@ -32,10 +32,16 @@ pub fn render_to_screen(
         .video_modes()
         .collect();
     video_modes.sort_by_key(|a| a.size().height * a.size().width);
-    let window_mode = video_modes.last().unwrap().clone();
+    let window_mode = video_modes
+        .into_iter()
+        .filter(|v| v.size().width == 480 && v.size().height == 270)
+        .last()
+        .unwrap()
+        .clone();
+    dbg!(&window_mode);
     let window = Arc::new(
         WindowBuilder::new()
-            .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
+            // .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
             .build(&event_loop)
             .unwrap(),
     );
