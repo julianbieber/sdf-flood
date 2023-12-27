@@ -144,17 +144,18 @@ float sdCatMouth(vec3 p) {
     return min(left, right);
 }
 
+const float eyeSize = 0.1;
+const float eyeOffsetX = 0.3;
+const float eyeOffsetY = 0.1;
+const float headRadius = 1.0;
+
+const vec3 rep = vec3(2.0, 8.0, 8.0);
 SceneSample scene(vec3 p) {
-    vec3 rep = vec3(2.0, 8.0, 8.0);
     vec3 pRep = p - rep * round(p / rep);
     vec3 repId = round(p / rep);
 
-    float headRadius = 1.0;
     float earSize = 0.3;
     float earOffset = 0.5;
-    float eyeSize = 0.1;
-    float eyeOffsetX = 0.3;
-    float eyeOffsetY = 0.1;
     float mouthWidth = 0.2;
     float mouthHeight = 0.1;
     float mouthOffsetY = -0.3;
@@ -166,6 +167,7 @@ SceneSample scene(vec3 p) {
 
     SceneSample leftEye = SceneSample(sdSphere(pRep - vec3(eyeOffsetX, eyeOffsetY, -headRadius * 0.9), eyeSize), 3, repId);
     SceneSample rightEye = SceneSample(sdSphere(pRep - vec3(-eyeOffsetX, eyeOffsetY, -headRadius * 0.9), eyeSize), 3, repId);
+
     SceneSample eye = combine(leftEye, rightEye);
 
     SceneSample nose = SceneSample(sdCatNose(pRep - vec3(0.0, 0.0, -headRadius * 0.9)), 4, repId);
@@ -335,7 +337,23 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
         return color;
     }
     if (index == 3) {
-        return vec4(0.0, 0.0, 0.0, 1.0);
+        vec3 rightEyeCenter =  vec3(-eyeOffsetX, eyeOffsetY, -headRadius );
+        vec3 rightEyeLeft =  rightEyeCenter - vec3(eyeSize,0.0,0.0);
+        vec3 rightEyeRight =  rightEyeCenter  + vec3(eyeSize,0.0,0.0);
+        vec3 leftEyeCenter = vec3(eyeOffsetX, eyeOffsetY, -headRadius);
+        vec3 leftEyeLeft = leftEyeCenter  - vec3(eyeSize,0.0,0.0);
+        vec3 leftEyeRight = leftEyeCenter + vec3(eyeSize,0.0,0.0);
+        float eyeOverLap = 1.3;
+        if((length(pRep - rightEyeLeft) < eyeSize * eyeOverLap && length(pRep - rightEyeRight) < eyeSize* eyeOverLap) ||
+        (length(pRep - leftEyeLeft) < eyeSize * eyeOverLap && length(pRep - leftEyeRight) < eyeSize* eyeOverLap) ){
+            return vec4(0.0, 0.0, 0.0, 1.0);
+        }else{
+            vec4 green = vec4(44.0/255.0, 73.0/255.0, 63.0/255.0,1.0);
+            vec4 brown = vec4(91.0/255.0, 58.0/255.0, 41.0/255.0, 1.0);
+            vec4 orange = vec4(255.0, 140.0, 0.0,1.0);
+
+            return green;// + 0.8 * orange;
+        }
     }
 
     if (index == 4) {
