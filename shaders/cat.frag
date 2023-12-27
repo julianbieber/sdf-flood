@@ -274,16 +274,17 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
         float d = 0;
         // vec4 baseColor = vec4(hash22(sin(repId.xy + noised(vec4(p, 0.0) * 0.01, 0.0))/0.01, 1.0), hash22(cos(repId.yz), 1.0));
         vec4 baseColor = (vec4(
-                // 0.2 * noised(vec4(pRep * 4.7, repId.x * 0.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
-                // 0.2 * noised(vec4(pRep * 4.7, repId.y * 0.1), repId.y) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
-                // 0.2 * noised(vec4(pRep * 4.7, repId.z * 0.1), repId.z) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
+                0.5 * noised(vec4(pRep * 4.7, repId.x * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
+                0.5 * noised(vec4(pRep * 4.7, repId.y * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
+                0.5 * noised(vec4(pRep * 4.7, repId.z * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
                 0.0));
         // baseColor = baseColor + vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 0.0);
-        vec4 brown = vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 1.0);
+        // vec4 brown = vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 1.0);
+        // vec4 brown = vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 1.0);
         // baseColor.x = smoothstep(baseColor.x, brown.x, max(noised(vec4(p * 0.3, 0.0), 0.3), 0.0));
         // baseColor.y = smoothstep(baseColor.y, brown.y, max(noised(vec4(p * 0.3, 1.0), 0.3), 0.0));
         // baseColor.z = smoothstep(baseColor.z, brown.z, max(noised(vec4(p * 0.3, 2.0), 0.3), 0.0));
-        baseColor = brown * max(noised(vec4(p * 4.3, 0.0), 0.3), 0.1);
+        baseColor = baseColor * max(noised(vec4(p * 4.3, 0.0), 0.3), 0.1);
         baseColor.w = 1.0;
         // vec4 baseColor = vec4(1.0);
         vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
@@ -292,6 +293,7 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
+        color.w = 1.0;
         return color;
     }
     if (index == 2) {
@@ -305,6 +307,7 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
+        color.w = 1.0;
         return color;
     }
     if (index == 3) {
@@ -321,18 +324,23 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
+        color.w = 1.0;
         return color;
     }
     if (index == 5) {
         return vec4(1.0, 0.0, 0.0, 1.0);
     }
-    return vec4(0);
+    vec4 c = vec4(0);
+    c.w = 1.0;
+    return c;
 }
 
 vec4 render(vec3 eye, vec3 ray) {
     RayEnd end = follow_ray(eye, ray, 100, 100.0);
     if (end.s.index == -1) {
-        return vec4(0.0);
+        vec4 c = vec4(0);
+        c.w = 1.0;
+        return c;
     }
     vec4 color = resolve_color(end.s.index, end.current_position, end.s.rep, ray);
     return color;
