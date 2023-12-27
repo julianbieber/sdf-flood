@@ -22,6 +22,7 @@ pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<V
         fragment_shader,
         fft,
         srgb,
+        false,
     )
     .await;
     state.render(f, t).unwrap();

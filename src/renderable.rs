@@ -30,6 +30,7 @@ impl MainDisplay {
         device: &Device,
         fragment_shader: &str,
         format: TextureFormat,
+        pi: bool,
     ) -> MainDisplay {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
@@ -98,7 +99,11 @@ impl MainDisplay {
                 bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
-        let vertices = Vertex::rect(Vector2 { x: 0.0, y: 0.0 }, 2.0, 2.0, 0.0);
+        let vertices = if pi {
+            Vertex::rect(Vector2 { x: -0.4, y: -0.45 }, 1.3, 1.1, 0.0)
+        } else {
+            Vertex::rect(Vector2 { x: 0.0, y: 0.0 }, 2.0, 2.0, 0.0)
+        };
         let mut vertex_bytes = vec![];
         let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
         vertex_bytes_writer
