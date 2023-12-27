@@ -241,17 +241,42 @@ float furDensity(vec3 pos) {
     float y = noised(vec4(uv * 123.0, uv * 129.0), 1.1) / 10.0;
 
     // thin out hair
-    float furThreshold = 0.5;
+    float furThreshold = 0.4;
     float density = smoothstep(furThreshold, 1.0, x);
+
+    // pos.y -= elevation;
+    vec3 p = pos;
+    // p = rotateX(p, sin(p.y));
+    float r = length(pos) - 0.12 * sin(6. * p.x) * cos(6. * p.y) * sin(6. * p.z);
+    float t = (r - (1. - furDepth)) / furDepth;
+
+    return density * (1. - t);
+}
+
+vec3 furNormal(vec3 pos, float density) {
+    float eps = 0.0001;
+    vec3 n;
+    n.x = furDensity(vec3(pos.x + eps, pos.y, pos.z)) - density;
+    n.y = furDensity(vec3(pos.x, pos.y + eps, pos.z)) - density;
+    n.z = furDensity(vec3(pos.x, pos.y, pos.z + eps)) - density;
+    return normalize(n);
+}
+vec3 furShade(vec3 pos, vec3 color, vec3 light, vec3 eye, float density) {
+    vec3 v = normalize(light - pos);
+    vec3 n = furNormal(pos, density);
+    vec3 ev = normalize(pos - eye);
+    vec3 h = reflect(ev, n);
+
+    float diff = max(0.0, dot(v, n)) + 0.4;
+    float spec = pow(max(0.0, dot(v, h)), 64.);
 
     float r = length(pos);
     float t = (r - (1.0 - furDepth)) / furDepth;
+    t = clamp(t, 0.3, 1.);
 
-    // fade out along length
-    float len = y;
-    density *= smoothstep(len, len - 0.2, t);
+    diff = mix(diff, 1., 0.5);
 
-    return density;
+    return color * t * (diff + 1.9 * spec);
 }
 
 vec2 hash22(vec2 p, float repScale) {
@@ -274,33 +299,40 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
     if (index == 1) {
         float d = 0;
         // vec4 baseColor = vec4(hash22(sin(repId.xy + noised(vec4(p, 0.0) * 0.01, 0.0))/0.01, 1.0), hash22(cos(repId.yz), 1.0));
-        vec4 baseColor = (vec4(
-                noised(vec4(pRep * 4.7, repId.x * 0.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
-                noised(vec4(pRep * 4.7, repId.y * 0.1), repId.y) + noised(vec4(pRep * 0.01 + 0.45, repId.y * 0.3), repId.y) + 1.5,
-                noised(vec4(pRep * 4.7, repId.z * 0.1), repId.z) + noised(vec4(pRep * 0.01 + 0.45, repId.z * 0.3), repId.z) + 1.5,
-                0.0));
-        baseColor = baseColor + vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 0.0);
-        baseColor.w = 1.0;
+        vec3 baseColor = (vec3(
+                0.5 * noised(vec4(pRep * 4.7, repId.x * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
+                0.5 * noised(vec4(pRep * 4.7, repId.y * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5,
+                0.5 * noised(vec4(pRep * 4.7, repId.z * 1.1), repId.x) + noised(vec4(pRep * 0.01 + 0.45, repId.x * 0.3), repId.x) + 1.5));
+        // baseColor = baseColor + vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 0.0);
+        // vec4 brown = vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 1.0);
+        // vec4 brown = vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 1.0);
+        // baseColor.x = smoothstep(baseColor.x, brown.x, max(noised(vec4(p * 0.3, 0.0), 0.3), 0.0));
+        // baseColor.y = smoothstep(baseColor.y, brown.y, max(noised(vec4(p * 0.3, 1.0), 0.3), 0.0));
+        // baseColor.z = smoothstep(baseColor.z, brown.z, max(noised(vec4(p * 0.3, 2.0), 0.3), 0.0));
+        baseColor = baseColor * max(noised(vec4(p * 4.3, 0.0), 0.3), 0.1);
         // vec4 baseColor = vec4(1.0);
-        vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+        vec3 color = vec3(0.0, 0.0, 0.0);
         vec3 samplePos = pRep;
         for (int i = 0; i < 100; i++) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
-        return color;
+        color = furShade(p, color, vec3(0.0, 10.0, 3.0), vec3(0.0, -10.0, 0.0), 0.6);
+        return vec4(color, 1.0);
     }
     if (index == 2) {
         float d = 0;
         // vec4 baseColor = vec4(hash22(sin(repId.xy)/0.01, 1.0), hash22(cos(repId.yz), 1.0));
-        vec4 baseColor = vec4(1.0);
+        vec4 baseColor = vec4(0.0);
+        baseColor = baseColor + vec4(205.0 / 255.0, 133.0 / 255.0, 63.0 / 255.0, 0.0) * 0.6;
         vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
         vec3 samplePos = pRep - vec3(0.0, 1.2, 0.0);
         for (int i = 0; i < 100; i++) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
-        return color * 0.8;
+        color.w = 1.0;
+        return color;
     }
     if (index == 3) {
         return vec4(0.0, 0.0, 0.0, 1.0);
@@ -311,23 +343,28 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
         // vec4 baseColor = vec4(hash22(sin(repId.xy + vec2(10.0, 1.0))/0.01, 1.0), hash22(cos(repId.yz), 1.0));
         vec4 baseColor = vec4(0.01);
         vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
-        vec3 samplePos = p;
+        vec3 samplePos = pRep - vec3(0.0, 0.0, 1.0);
         for (int i = 0; i < 100; i++) {
             color += baseColor * furDensity(samplePos);
             samplePos += dir * 0.01;
         }
+        color.w = 1.0;
         return color;
     }
     if (index == 5) {
         return vec4(1.0, 0.0, 0.0, 1.0);
     }
-    return vec4(0);
+    vec4 c = vec4(0);
+    c.w = 1.0;
+    return c;
 }
 
 vec4 render(vec3 eye, vec3 ray) {
     RayEnd end = follow_ray(eye, ray, 100, 100.0);
     if (end.s.index == -1) {
-        return vec4(0.0);
+        vec4 c = vec4(0);
+        c.w = 1.0;
+        return c;
     }
     vec4 color = resolve_color(end.s.index, end.current_position, end.s.rep, ray);
     return color;
@@ -338,7 +375,7 @@ void main() {
     vec2 pixel_position = ((uv - 0.5) * vec2(1.92, 1.08)) / 1.08;
     vec3 ray_direction = normalize(vec3(pixel_position, 1.0));
 
-    out_color = render(vec3(0.0, 0.0, -5.0), ray_direction);
+    out_color = render(vec3(-1.0, -1.0, -5.0), ray_direction);
     // out_color = vec4(pixel_position, 0.0, 1.0);
     // out_color = vec4(sin(sdFbm(vec3(uv * 40.0, 0.0), 7.0)), 0.0, 0.0, 1.0);
 }
