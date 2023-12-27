@@ -448,7 +448,7 @@ float sdCatMouth(vec3 p) {
 }
 
 SceneSample scene(vec3 p, vec3 dir) {
-    vec3 rep = vec3(2.0, 8.0, 8.0);
+    vec3 rep = vec3(4.0, 10.0, 10.0);
     vec3 pRep = p - rep * round(p / rep);
     vec3 repId = round(p / rep);
 
@@ -524,17 +524,17 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
             break;
         }
         if (s.closest_distance < 0.01) {
-            traveled += 0.01;
+            traveled += 0.001;
         } else {
             traveled += s.closest_distance;
         }
     }
-
+    joinedColor.w = 1.0;
     return RayEnd(SceneSample(traveled, -1, vec3(0.0), joinedColor, false), start + direction * traveled);
 }
 
 vec4 render(vec3 eye, vec3 ray) {
-    RayEnd end = follow_ray(eye, ray, 1800, 100.0);
+    RayEnd end = follow_ray(eye, ray, 500, 100.0);
     return end.s.color;
     // if (end.s.index == -1) {
     //     vec4 c = vec4(0);
