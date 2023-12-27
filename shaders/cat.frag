@@ -305,6 +305,7 @@ vec4 resolve_color(int index, vec3 p, vec3 repId, vec3 dir) {
         vec3 r = reflect((light), n);
         float lightFactor = dot(n, normalize(light - pRep));
         return vec4(furShade(pRep, baseColor, vec3(0.0, 4.0, 4.0), vec3(-4.0, 0.0, -5.0), d) * 2.0 * max(lightFactor, 0.1), d);
+
     }
     if (index == 2) {
         float d = 0;
@@ -363,6 +364,137 @@ return vec4(255.0 / 255.0, 55.0 / 255.0, 0.0 / 255.0, 1.0)*0.4;    }
     return c;
 }
 
+
+vec3 rotate(vec3 p, float yaw, float pitch, float roll) {
+    return (mat3(cos(yaw), -sin(yaw), 0.0, sin(yaw), cos(yaw), 0.0, 0.0, 0.0, 1.0) *
+        mat3(cos(pitch), 0.0, sin(pitch), 0.0, 1.0, 0.0, -sin(pitch), 0.0, cos(pitch)) *
+        mat3(1.0, 0.0, 0.0, 0.0, cos(roll), -sin(roll), 0.0, sin(roll), cos(roll))) *
+        p;
+}
+float sphere(vec3 p, vec3 center, float radius) {
+    return length(p - center) - radius;
+}
+float sdSphere(vec3 p, float r) {
+    return length(p) - r;
+}
+
+float sdCone(vec3 p, vec2 c, float h) {
+    // c is the sin/cos of the angle, h is height
+    // Alternatively pass q instead of (c,h),
+    // which is the point at the base in 2D
+    vec2 q = h * vec2(c.x / c.y, -1.0);
+
+    vec2 w = vec2(length(p.xz), p.y);
+    vec2 a = w - q * clamp(dot(w, q) / dot(q, q), 0.0, 1.0);
+    vec2 b = w - q * vec2(clamp(w.x / q.x, 0.0, 1.0), 1.0);
+    float k = sign(q.y);
+    float d = min(dot(a, a), dot(b, b));
+    float s = max(k * (w.x * q.y - w.y * q.x), k * (w.y - q.y));
+    return sqrt(d) * sign(s);
+}
+
+float sdConeBound(vec3 p, vec2 c, float h) {
+    float q = length(p.xz) / 2.0;
+    return max(dot(c.xy, vec2(q, p.y)), -h - p.y);
+}
+
+float sdBox(vec3 p, vec3 b) {
+    vec3 d = abs(p) - b;
+    return min(max(d.x, max(d.y, d.z)), 0.0) + length(max(d, 0.0));
+}
+
+float sdPlane(vec3 p, vec3 n, float h) {
+    // n must be normalized
+    return dot(p, n) + h;
+}
+
+float sdCylinder(vec3 p, vec3 c, float h, float r) {
+    vec2 d = abs(vec2(length(p.xz - c.xz), p.y - c.y)) - vec2(r, h);
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+}
+
+SceneSample combine(SceneSample a, SceneSample b) {
+    if (b.closest_distance < a.closest_distance) {
+        return b;
+    } else {
+        return a;
+    }
+}
+
+float sdTriPrism(vec3 p, vec2 h) {
+    vec3 q = abs(p);
+    return max(q.z - h.y, max(q.x * 0.866025 + p.y * 0.5, -p.y) - h.x * 0.5);
+}
+
+float sdRoundTriPrism(vec3 p, vec2 h, float r) {
+    return max(sdTriPrism(p, h), -sdSphere(p - vec3(0.0, h.x * 0.5, -1.0), r));
+}
+
+float sdCappedTorus(vec3 p, vec2 sc, float ra, float rb) {
+    p.x = abs(p.x);
+    float k = (sc.y * p.x > sc.x * p.y) ? dot(p.xy, sc) : length(p.xy);
+    return sqrt(dot(p, p) + ra * ra - 2.0 * ra * k) - rb;
+}
+
+float sdCatNose(vec3 p) {
+    return sdSphere(p, 0.11);
+}
+
+float sdCatMouth(vec3 p) {
+    vec3 pRot = rotate(p, PI, 0.0, 0.0);
+    float left = sdCappedTorus(pRot + vec3(-0.09, 0.0, 1.0), vec2(0.1, 0.1), 0.15, 0.01);
+    float right = sdCappedTorus(pRot + vec3(0.09, 0.0, 1.0), vec2(0.1, 0.1), 0.15, 0.01);
+    return min(left, right);
+}
+
+SceneSample scene(vec3 p, vec3 dir) {
+    vec3 rep = vec3(2.0, 8.0, 8.0);
+    vec3 pRep = p - rep * round(p / rep);
+    vec3 repId = round(p / rep);
+
+    float headRadius = 1.0;
+    float earSize = 0.3;
+    float earOffset = 0.5;
+    float eyeSize = 0.1;
+    float eyeOffsetX = 0.3;
+    float eyeOffsetY = 0.1;
+    float mouthWidth = 0.2;
+    float mouthHeight = 0.1;
+    float mouthOffsetY = -0.3;
+    SceneSample head = SceneSample(sdSphere(pRep, headRadius), 1, repId, vec4(0.0), true);
+
+    SceneSample leftEar = SceneSample(sdConeBound(pRep + vec3(-earOffset, -headRadius + 0.0, 0.2), vec2(0.35, 0.1), 0.5), 2, repId, vec4(0.0), false);
+    SceneSample rightEar = SceneSample(sdConeBound(pRep + vec3(earOffset, -headRadius + 0.0, 0.2), vec2(0.35, 0.1), 0.5), 2, repId, vec4(0.0), false);
+    SceneSample ear = combine(leftEar, rightEar);
+
+    SceneSample leftEye = SceneSample(sdSphere(pRep - vec3(eyeOffsetX, eyeOffsetY, -headRadius * 0.9), eyeSize), 3, repId, vec4(0.0), false);
+    SceneSample rightEye = SceneSample(sdSphere(pRep - vec3(-eyeOffsetX, eyeOffsetY, -headRadius * 0.9), eyeSize), 3, repId, vec4(0.0), false);
+    SceneSample eye = combine(leftEye, rightEye);
+
+    SceneSample nose = SceneSample(sdCatNose(pRep - vec3(0.0, 0.0, -headRadius * 0.9)), 4, repId, vec4(0.0), false);
+
+    SceneSample mouth = SceneSample(sdCatMouth(pRep), 5, repId, vec4(0.0), false);
+
+    SceneSample combined = combine(mouth, combine(nose, combine(head, combine(eye, ear))));
+    if (combined.closest_distance < 0.01) {
+        combined.color = resolve_color(combined.index, p, repId, dir);
+    }
+    return combined;
+    // return head;
+}
+
+float scene_f(vec3 p, vec3 dir) {
+    return scene(p, dir).closest_distance;
+}
+
+vec3 normal(in vec3 p, vec3 dir) // for function f(p)
+{
+    const float eps = 0.0001; // or some other value
+    const vec2 h = vec2(eps, 0);
+    return normalize(vec3(scene_f(p + h.xyy, dir) - scene_f(p - h.xyy, dir),
+            scene_f(p + h.yxy, dir) - scene_f(p - h.yxy, dir),
+            scene_f(p + h.yyx, dir) - scene_f(p - h.yyx, dir)));
+}
 float fov_factor() {
     return tan(FOV / 2.0 * PI / 180.0);
 }
@@ -382,13 +514,9 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
         vec3 p = start + direction * traveled;
         SceneSample s = scene(p, direction);
         if (s.closest_distance < 0.01) {
-            s.color = resolve_color(s.index, p, s.rep, direction);
-        }
-        if (s.closest_distance < 0.01) {
             s.color = joinColors(s.color, joinedColor);
             joinedColor = s.color;
             if (!s.cont || joinedColor.w > 0.99) {
-                s.color.w = 1.0;
                 return RayEnd(s, p);
             }
         }
@@ -396,12 +524,12 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
             break;
         }
         if (s.closest_distance < 0.01) {
-            traveled += 0.001;
+            traveled += 0.01;
         } else {
             traveled += s.closest_distance;
         }
     }
-    joinedColor.w = 1.0;
+
     return RayEnd(SceneSample(traveled, -1, vec3(0.0), joinedColor, false), start + direction * traveled);
 }
 
