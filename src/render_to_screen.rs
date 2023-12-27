@@ -41,7 +41,7 @@ pub fn render_to_screen(
     dbg!(&window_mode);
     let window = Arc::new(
         WindowBuilder::new()
-            // .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
+            .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
             .build(&event_loop)
             .unwrap(),
     );
@@ -70,6 +70,7 @@ pub fn render_to_screen(
         fragment_shader,
         fft,
         srgb,
+        pi,
     ));
     event_loop
         .run(move |event, elwt| match event {

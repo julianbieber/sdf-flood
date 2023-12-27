@@ -249,6 +249,7 @@ impl<'a> RenderState<'a> {
 
 impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         instance: Instance,
         surface: Option<Surface<'a>>,
@@ -257,6 +258,7 @@ impl<'a> State<'a> {
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
         srgb: bool,
+        pi: bool,
     ) -> (Self, Option<TextureView>, Option<Texture>) {
         let (render_state, file_info, f) =
             RenderState::new(instance, surface, size, srgb, format).await;
@@ -265,6 +267,7 @@ impl<'a> State<'a> {
             &render_state.device,
             fragment_shader_s,
             render_state.format,
+            pi,
         );
         let ui = UIElements::new(&render_state.device, render_state.format);
 
