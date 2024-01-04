@@ -242,7 +242,7 @@ float furDensity(vec3 pos) {
 
     // pos.y -= elevation;
     vec3 p = pos;
-    p = rotateY(p, PI / 2.0);
+    // p = rotateY(p, PI);
     float r = length(pos) - 0.12 * sin(6. * p.x) * cos(6. * p.y) * sin(6. * p.z);
     float t = (r - (1. - furDepth)) / furDepth;
 
@@ -524,7 +524,7 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
             break;
         }
         if (s.closest_distance < 0.01) {
-            traveled += 0.001;
+            traveled += 0.01;
         } else {
             traveled += s.closest_distance;
         }
@@ -534,7 +534,7 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
 }
 
 vec4 render(vec3 eye, vec3 ray) {
-    RayEnd end = follow_ray(eye, ray, 500, 100.0);
+    RayEnd end = follow_ray(eye, ray, 90, 100.0);
     return end.s.color;
     // if (end.s.index == -1) {
     //     vec4 c = vec4(0);
