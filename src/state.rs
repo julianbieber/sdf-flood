@@ -238,6 +238,8 @@ impl<'a> RenderState<'a> {
                 self.device.poll(wgpu::MaintainBase::Wait);
                 pollster::block_on(async { rx.await.unwrap().unwrap() });
                 let data = buffer_slice.get_mapped_range();
+                dbg!(data.len());
+                dbg!(data[0]);
                 let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(1920, 1080, data).unwrap();
                 buffer.save("screen.png").unwrap();
             }
