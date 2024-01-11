@@ -54,7 +54,7 @@ float noise(vec2 n) {
 
 float surface(vec3 p) {
     float plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 0.0);
-    plane -= (noise(p.xz)) * 0.1;
+    plane -= (noise(p.xz)) * 0.6;
 
     return plane;
 }
@@ -110,7 +110,8 @@ vec4 resolve_color(int index, vec3 p, vec3 dir) {
         float light = dot(n, vec3(0.0, 10.0, 0.0));
         vec3 white = vec3(1.0);
         vec3 blue = vec3(0.0, 0.0, 1.0);
-        vec3 inter = (p.y * white + (1.0 - p.y) * blue) * light;
+        float f = p.y * 0.1;
+        vec3 inter = (f * white + (1.0 - f) * blue) * light;
         return vec4(inter, 1.0);
     }
     return vec4(0);
@@ -128,9 +129,9 @@ vec4 render(vec3 eye, vec3 ray) {
 void main() {
     float fov = fov_factor();
     vec2 pixel_position = ((uv - 0.5) * vec2(1.92, 1.2)) / 1.2;
-    vec3 ray_direction = normalize(vec3(pixel_position, 1.0));
+    vec3 ray_direction = normalize(vec3(pixel_position.x, pixel_position.y - 0.4, 1.0));
 
-    out_color = render(vec3(0.0, 2.0, -10.0), ray_direction);
+    out_color = render(vec3(0.0, 20.0, -10.0), ray_direction);
     // out_color = vec4(pixel_position, 0.0, 1.0);
     // out_color = vec4(sin(sdFbm(vec3(uv * 40.0, 0.0), 7.0)), 0.0, 0.0, 1.0);
 }
