@@ -52,9 +52,20 @@ float noise(vec2 n) {
     return mix(mix(rand2(b), rand2(b + d.yx), f.x), mix(rand2(b + d.xy), rand2(b + d.yy), f.x), f.y);
 }
 
+float fbm(in vec2 x, in float H) {
+    float t = 0.0;
+    for (int i = 0; i < 4; i++)
+    {
+        float f = pow(2.0, float(i));
+        float a = pow(f, -H);
+        t += a * noise(f * x);
+    }
+    return t;
+}
+
 float surface(vec3 p) {
     float plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 0.0);
-    plane -= (noise(p.xz)) * 0.6;
+    plane -= (fbm(p.xz + u.time, 0.5)) * 0.6;
 
     return plane;
 }
