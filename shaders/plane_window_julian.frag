@@ -52,20 +52,50 @@ float noise(vec2 n) {
     return mix(mix(rand2(b), rand2(b + d.yx), f.x), mix(rand2(b + d.xy), rand2(b + d.yy), f.x), f.y);
 }
 
+vec3 hash3(vec2 p) {
+    vec3 q = vec3(dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3)),
+            dot(p, vec2(419.2, 371.9)));
+    return fract(sin(q) * 43758.5453);
+}
+
+float voronoise(vec2 p, float u, float v) {
+    float k = 1.0 + 63.0 * pow(1.0 - v, 6.0);
+
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    vec2 a = vec2(0.0, 0.0);
+    for (float y = -2; y <= 2; y++) {
+        for (float x = -2; x <= 2; x++) {
+            vec2 g = vec2(x, y);
+            vec3 o = hash3(i + g) * vec3(u, u, 1.0);
+            vec2 d = g - f + o.xy;
+            float w = pow(1.0 - smoothstep(0.0, 1.414, length(d)), k);
+            return w * 10.0;
+            a += vec2(o.z * w, w);
+        }
+    }
+
+    // return a.x / a.y;
+    return a.y;
+}
+
 float fbm(in vec2 x, in float H) {
     float t = 0.0;
-    for (int i = 0; i < 4; i++)
-    {
-        float f = pow(2.0, float(i));
-        float a = pow(f, -H);
-        t += a * noise(f * x);
-    }
-    return t;
+    // for (int i = 0; i < 2; i++)
+    // {
+    //     float f = pow(2.0, float(i));
+    //     float a = pow(f, -H);
+    //     t += a * voronoise(f * x, 1.0, 1.0);
+    // }
+    // return t;
+    return voronoise(x , 1.0, 1.0) * 1.0;
 }
 
 float surface(vec3 p) {
     float plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 0.0);
-    plane -= (fbm(p.xz + u.time, 0.5)) * 0.6;
+    plane -= (fbm(vec2(noise(p.xz), noise(p.xy)), 0.5)) * 0.6;
 
     return plane;
 }
@@ -124,8 +154,9 @@ vec4 resolve_color(int index, vec3 p, vec3 dir) {
         float f = p.y * 0.1;
         vec3 inter = (f * white + (1.0 - f) * blue) * light;
         return vec4(inter, 1.0);
+        // return vec4(voronoise(p.xz / 0.00001, 0.0, 0.0));
     }
-    return vec4(0);
+    return vec4(1.0);
 }
 
 vec4 render(vec3 eye, vec3 ray) {
