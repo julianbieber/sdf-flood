@@ -94,8 +94,8 @@ float smoothVoronoi( in vec2 x )
     vec2  f = fract( x );
 
     float res = 0.0;
-    for( int j=-2; j<=3; j++ )
-    for( int i=-7; i<=4; i++ )
+    for( int j=-2; j<=2; j++ )
+    for( int i=-2; i<=2; i++ )
     {
         vec2 b = vec2( i, j );
         vec2  r = vec2( b ) - f + hash2( p + b );
@@ -169,13 +169,18 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
     return RayEnd(SceneSample(traveled, -1), start + direction * traveled);
 }
 
+vec2 circle(float angle) {
+    return vec2(cos(angle), sin(angle));
+}
+
 vec4 resolve_color(int index, vec3 p, vec3 dir) {
     if (index == 1) {
         vec3 n = normal(p);
-        float light = dot(n, vec3(0.0, 10.0, sin(u.time * 0.2) * 10.0));
+        vec2 sun = 10.0 * circle(u.time * 0.1) ;
         vec3 white = vec3(1.0);
         vec3 blue = vec3(0.0, 0.0, 1.0);
         float f = (p.y) * 0.02;
+        float light = dot(n, vec3(0.0, sun.x + 5.0, sun.y));
         vec3 inter = (f * white + (1.0 - f) * blue) * light;
         return vec4(inter, 1.0);
     }
