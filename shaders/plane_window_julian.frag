@@ -59,6 +59,12 @@ vec3 hash3( vec2 p )
 				   dot(p,vec2(419.2,371.9)) );
 	return fract(sin(q)*43758.5453);
 }
+vec2 hash2( vec2 p )
+{
+    vec2 q = vec2( dot(p,vec2(127.1,311.7)), 
+				   dot(p,vec2(269.5,183.3)) );
+	return fract(sin(q)*43758.5453);
+}
 
 float voronoise( vec2 p, float u, float v )
 {
@@ -68,25 +74,44 @@ float voronoise( vec2 p, float u, float v )
     vec2 f = fract(p);
     
 	vec2 a = vec2(0.0,0.0);
-    for( int y=-3; y<=3; y++ )
-    for( int x=-3; x<=3; x++ )
+    for( int y=-4; y<=4; y++ )
+    for( int x=-4; x<=4; x++ )
     {
         vec2  g = vec2( x, y );
 		vec3  o = hash3( i + g )*vec3(u,u,1.0);
-		vec2  d = fract(g - f + o.xy);
+		// vec2  d = normalize(g - f + o.xy);
+		vec2 d = vec2(1.3, 0.0);
 		float w = pow( 1.0-smoothstep(0.0,1.414,length(d)), k );
 		a += vec2(o.z*w,w);
     }
 	
     return a.x/a.y;
 }
+
+float smoothVoronoi( in vec2 x )
+{
+    vec2 p = floor( x );
+    vec2  f = fract( x );
+
+    float res = 0.0;
+    for( int j=-2; j<=3; j++ )
+    for( int i=-7; i<=4; i++ )
+    {
+        vec2 b = vec2( i, j );
+        vec2  r = vec2( b ) - f + hash2( p + b );
+        float d = length( r );
+
+        res += exp2( -32.0*d );
+    }
+    return -(1.0/32.0)*log2( res );
+}
 float fbm(vec2 x, float H) {
     float t = 0.0;
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 4; i++)
     {
-        float f = pow(2.0, float(i));
+        float f = pow(1.2, float(i));
         float a = pow(f, -H);
-        t += a * voronoise(f * x, 1.0, 1.0);
+        t += a * smoothVoronoi(f * x);
     }
     return t;
     // return voronoise(x , 1.0, 1.0) * 1.0;
@@ -94,7 +119,7 @@ float fbm(vec2 x, float H) {
 
 float surface(vec3 p) {
     float plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 0.0);
-    plane -= (fbm(p.xz, 0.2)) * 0.6;
+    plane -= (fbm(p.xz*0.4, 0.4)) * 0.8;
 
     return plane;
 }
@@ -147,13 +172,12 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
 vec4 resolve_color(int index, vec3 p, vec3 dir) {
     if (index == 1) {
         vec3 n = normal(p);
-        float light = dot(n, vec3(0.0, 10.0, 0.0));
+        float light = dot(n, vec3(0.0, 10.0, sin(u.time * 0.2) * 10.0));
         vec3 white = vec3(1.0);
         vec3 blue = vec3(0.0, 0.0, 1.0);
-        float f = p.y * 0.1;
+        float f = (p.y) * 0.02;
         vec3 inter = (f * white + (1.0 - f) * blue) * light;
         return vec4(inter, 1.0);
-        // return vec4(voronoise(p.xz / 0.00001, 0.0, 0.0));
     }
     return vec4(1.0);
 }
