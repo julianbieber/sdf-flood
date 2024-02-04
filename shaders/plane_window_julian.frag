@@ -52,58 +52,58 @@ float noise(vec2 n) {
     return mix(mix(rand2(b), rand2(b + d.yx), f.x), mix(rand2(b + d.xy), rand2(b + d.yy), f.x), f.y);
 }
 
-vec3 hash3( vec2 p )
+vec3 hash3(vec2 p)
 {
-    vec3 q = vec3( dot(p,vec2(127.1,311.7)), 
-				   dot(p,vec2(269.5,183.3)), 
-				   dot(p,vec2(419.2,371.9)) );
-	return fract(sin(q)*43758.5453);
+    vec3 q = vec3(dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3)),
+            dot(p, vec2(419.2, 371.9)));
+    return fract(sin(q) * 43758.5453);
 }
-vec2 hash2( vec2 p )
+vec2 hash2(vec2 p)
 {
-    vec2 q = vec2( dot(p,vec2(127.1,311.7)), 
-				   dot(p,vec2(269.5,183.3)) );
-	return fract(sin(q)*43758.5453);
+    vec2 q = vec2(dot(p, vec2(127.1, 311.7)),
+            dot(p, vec2(269.5, 183.3)));
+    return fract(sin(q) * 43758.5453);
 }
 
-float voronoise( vec2 p, float u, float v )
+float voronoise(vec2 p, float u, float v)
 {
-	float k = 1.0+63.0*pow(1.0-v,6.0);
+    float k = 1.0 + 63.0 * pow(1.0 - v, 6.0);
 
     vec2 i = floor(p);
     vec2 f = fract(p);
-    
-	vec2 a = vec2(0.0,0.0);
-    for( int y=-4; y<=4; y++ )
-    for( int x=-4; x<=4; x++ )
-    {
-        vec2  g = vec2( x, y );
-		vec3  o = hash3( i + g )*vec3(u,u,1.0);
-		// vec2  d = normalize(g - f + o.xy);
-		vec2 d = vec2(1.3, 0.0);
-		float w = pow( 1.0-smoothstep(0.0,1.414,length(d)), k );
-		a += vec2(o.z*w,w);
-    }
-	
-    return a.x/a.y;
+
+    vec2 a = vec2(0.0, 0.0);
+    for (int y = -4; y <= 4; y++)
+        for (int x = -4; x <= 4; x++)
+        {
+            vec2 g = vec2(x, y);
+            vec3 o = hash3(i + g) * vec3(u, u, 1.0);
+            // vec2  d = normalize(g - f + o.xy);
+            vec2 d = vec2(1.3, 0.0);
+            float w = pow(1.0 - smoothstep(0.0, 1.414, length(d)), k);
+            a += vec2(o.z * w, w);
+        }
+
+    return a.x / a.y;
 }
 
-float smoothVoronoi( in vec2 x )
+float smoothVoronoi(in vec2 x)
 {
-    vec2 p = floor( x );
-    vec2  f = fract( x );
+    vec2 p = floor(x);
+    vec2 f = fract(x);
 
     float res = 0.0;
-    for( int j=-2; j<=2; j++ )
-    for( int i=-2; i<=2; i++ )
-    {
-        vec2 b = vec2( i, j );
-        vec2  r = vec2( b ) - f + hash2( p + b );
-        float d = length( r );
+    for (int j = -2; j <= 2; j++)
+        for (int i = -2; i <= 2; i++)
+        {
+            vec2 b = vec2(i, j);
+            vec2 r = vec2(b) - f + hash2(p + b);
+            float d = length(r);
 
-        res += exp2( -32.0*d );
-    }
-    return -(1.0/32.0)*log2( res );
+            res += exp2(-32.0 * d);
+        }
+    return -(1.0 / 32.0) * log2(res);
 }
 float fbm(vec2 x, float H) {
     float t = 0.0;
@@ -119,7 +119,7 @@ float fbm(vec2 x, float H) {
 
 float surface(vec3 p) {
     float plane = sdPlane(p, vec3(0.0, 1.0, 0.0), 0.0);
-    plane -= (fbm(p.xz*0.4, 0.4)) * 0.8;
+    plane -= (fbm(p.xz * 0.4, 0.4)) * 0.8;
 
     return plane;
 }
@@ -176,7 +176,7 @@ vec2 circle(float angle) {
 vec4 resolve_color(int index, vec3 p, vec3 dir) {
     if (index == 1) {
         vec3 n = normal(p);
-        vec2 sun = 10.0 * circle(u.time * 0.1) ;
+        vec2 sun = 10.0 * circle(u.time * 0.1);
         vec3 white = vec3(1.0);
         vec3 blue = vec3(0.0, 0.0, 1.0);
         float f = (p.y) * 0.02;
