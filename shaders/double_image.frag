@@ -16,7 +16,7 @@ layout(binding = 2) readonly buffer SliderParameters {
 #define TAU 6.2831853071
 
 float rand2(vec2 x) {
-    // return fract(sin(x.x * 2382.0 * x.y *1786.0));
+    // return fract(sin(x.x * 2382.0 * x.y *1786.0+u.time*sin(u.time*0.2)));
     return fract(sin(dot(x, vec2(12.9898,78.233)))*43758.5453123+u.time);
 }
 
