@@ -2,6 +2,13 @@
 name = "sdf_experiment"
 version = "0.1.0"
 edition = "2021"
+default-run = "main"
+
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -9,30 +16,53 @@ edition = "2021"
 winit = "0.29"
 env_logger = "0.10"
 log = "0.4"
-wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "79e5169", features = ["glsl"] }
 pollster = "0.3"
 crevice = {version = "0.13.0"}
 mint = "0.5"
-nanorand = "0.7"
+# nanorand = "0.7"
 clap = { version = "4.3.21", features = ["derive"] }
 cpal = "0.15.2"
 spectrum-analyzer = "1.5.0"
 tokio = { version = "1.34.0", features = ["sync"] }
 async-trait = "0.1.74"
-image = { version = "0.24.9", features = ["default"]}
-imageproc = "0.23.0"
 itertools = "0.12.1"
+cfg-if = "1.0.0"
+hound = "3.5.1"
 
-[dependencies.nokhwa]
+[target.'cfg(target_family = "wasm")'.dependencies]
+wgpu = { version = "0.19.1", features = ["glsl", "webgl"], default-features=false }
+console_error_panic_hook = "0.1.6"
+console_log = "1.0"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "=0.3.67", features = [
+    "Document",
+    "Window",
+    "Element",
+    "console",
+    "MouseEvent"
+]}
+web-time = "1.0.0"
+cpal = {version = "0.15.2", features = ["wasm-bindgen"]}
+gloo = "0.11.0"
+ 
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+ 
+
+[target.'cfg(all(unix, not(target_family = "wasm")))'.dependencies]
+wgpu = { version = "0.19.1", features = ["glsl"] }
+image = { version = "0.25.0", features = ["default"]}
+imageproc = "0.25.0"
+
+[target.'cfg(all(unix, not(target_family = "wasm")))'.dependencies.nokhwa]
 # Use the native input backends, enable WGPU integration
 features = ["input-native", "decoding"]
 git = "https://github.com/l1npengtul/nokhwa.git" 
 branch = "0.10"
 
-
-
 [dependencies.naga]
-git = "https://github.com/gfx-rs/naga"
-rev = "d0f28c0"
-version = "0.14.0"
+version = "0.19.0"
 features = ["clone"]
+

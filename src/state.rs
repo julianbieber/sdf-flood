@@ -1,6 +1,13 @@
+#[allow(dead_code)]
 use std::sync::{Arc, Mutex};
 
+use cfg_if::cfg_if;
+
+cfg_if! {
+if #[cfg(target_arch = "wasm32")] { } else {
 use image::{ImageBuffer, Rgba};
+}
+}
 use tokio::sync::oneshot::channel;
 use wgpu::{
     BufferAddress, BufferDescriptor, BufferUsages, ImageCopyBuffer, ImageCopyTexture,
@@ -69,7 +76,7 @@ impl<'a> RenderState<'a> {
                         &wgpu::DeviceDescriptor {
                             label: Some("device"),
                             required_features: wgpu::Features::empty(),
-                            required_limits: wgpu::Limits::default(),
+                            required_limits: wgpu::Limits::downlevel_defaults(),
                         },
                         None,
                     )
@@ -84,8 +91,13 @@ impl<'a> RenderState<'a> {
                     present_mode: wgpu::PresentMode::Fifo,
                     alpha_mode: surface_caps.alpha_modes[0],
                     view_formats: vec![],
+                    desired_maximum_frame_latency: 2,
                 };
+                let w = size.width;
+                let h = size.height;
+                log::warn!("after configure {w:?} {h:?}");
                 surface.configure(&device, &config);
+                log::warn!("after configure");
                 (
                     RenderState {
                         surface: SurfaceTypes::Window(surface),
@@ -230,18 +242,23 @@ impl<'a> RenderState<'a> {
                 output.unwrap().present();
             }
             SurfaceTypes::File() => {
-                let buffer_slice = ob.as_ref().unwrap().slice(..);
-                let (tx, rx) = channel();
-                buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-                    tx.send(result).unwrap();
-                });
-                self.device.poll(wgpu::MaintainBase::Wait);
-                pollster::block_on(async { rx.await.unwrap().unwrap() });
-                let data = buffer_slice.get_mapped_range();
-                dbg!(data.len());
-                dbg!(data[0]);
-                let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(1920, 1080, data).unwrap();
-                buffer.save("screen.png").unwrap();
+                cfg_if! {
+                    if #[cfg(target_arch = "wasm32")] { }
+                    else {
+                        let buffer_slice = ob.as_ref().unwrap().slice(..);
+                        let (tx, rx) = channel();
+                        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+                            tx.send(result).unwrap();
+                        });
+                        self.device.poll(wgpu::MaintainBase::Wait);
+                        pollster::block_on(async { rx.await.unwrap().unwrap() });
+                        let data = buffer_slice.get_mapped_range();
+                        dbg!(data.len());
+                        dbg!(data[0]);
+                        let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(1920, 1080, data).unwrap();
+                        buffer.save("screen.png").unwrap();
+                    }
+                }
             }
         }
         // output.map(|o| o.present());
@@ -330,6 +347,7 @@ impl<'a> State<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn report_click(&mut self, position: (f32, f32)) {
         self.ui
             .click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))

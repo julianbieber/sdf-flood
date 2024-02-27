@@ -1,7 +1,11 @@
+#[cfg(all(unix, not(target_family = "wasm")))]
+use std::time::Instant;
 use std::{
+    num::NonZeroU64,
     sync::{Arc, Mutex},
-    time::Instant,
 };
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 use mint::Vector2;
 use wgpu::{
@@ -62,7 +66,7 @@ impl MainDisplay {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform {},
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: NonZeroU64::new(16),
                     },
                     count: None,
                 },

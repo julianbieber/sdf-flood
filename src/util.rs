@@ -1,4 +1,7 @@
+#[cfg(all(unix, not(target_family = "wasm")))]
 use std::time::Instant;
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 pub struct Fps {
     buffer: [u64; 32],
