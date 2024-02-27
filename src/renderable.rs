@@ -1,7 +1,11 @@
+#[cfg(all(unix, not(target_family = "wasm")))]
+use std::time::Instant;
 use std::{
+    num::NonZeroU64,
     sync::{Arc, Mutex},
-    time::Instant,
 };
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 use mint::Vector2;
 use wgpu::{
@@ -19,8 +23,8 @@ pub struct MainDisplay {
     pub time_start: Instant,
     pub fft: Arc<Mutex<Vec<f32>>>,
     pub time_buffer: Buffer,
-    pub fft_buffer: Buffer,
-    pub slider_buffer: Buffer,
+    // pub fft_buffer: Buffer,
+    // pub slider_buffer: Buffer,
     pub vertices: Buffer,
     pub bind_group: BindGroup,
 }
@@ -57,41 +61,42 @@ impl MainDisplay {
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform {},
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: NonZeroU64::new(16),
                     },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 1,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
+                // wgpu::BindGroupLayoutEntry {
+                //     binding: 2,
+                //     visibility: wgpu::ShaderStages::FRAGMENT,
+                //     ty: wgpu::BindingType::Buffer {
+                //         ty: wgpu::BufferBindingType::Storage { read_only: true },
+                //         has_dynamic_offset: false,
+                //         min_binding_size: None,
+                //     },
+                //     count: None,
+                // },
             ],
         });
         let time_buffer = create_float_buffer("time", device, 0.0);
         let fft_lock = fft.lock().unwrap();
-        let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
+        // let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
         drop(fft_lock);
-        let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
+        // let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
         let bind_group = create_bind_group(
             device,
             &bind_group_layout,
-            &[&time_buffer, &fft_buffer, &slider_buffer],
+            // &[&time_buffer, &fft_buffer, &slider_buffer],
+            &[&time_buffer],
         );
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -130,10 +135,10 @@ impl MainDisplay {
             time_start: Instant::now(),
             fft,
             time_buffer,
-            fft_buffer,
+            // fft_buffer,
             vertices: vertex_buffer,
             bind_group,
-            slider_buffer,
+            // slider_buffer,
         }
     }
 
@@ -144,7 +149,7 @@ impl MainDisplay {
         render_pass.draw(0..6, 0..1);
     }
 
-    pub fn update_buffers(&self, queue: &Queue, ui: &UIElements) {
+    pub fn update_buffers(&self, queue: &Queue) {
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
         sphere_bytes_writer
@@ -156,20 +161,20 @@ impl MainDisplay {
         let fft_lock = self.fft.lock().unwrap();
         sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
         drop(fft_lock);
-        queue.write_buffer(&self.fft_buffer, 0, &bytes);
+        // queue.write_buffer(&self.fft_buffer, 0, &bytes);
 
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        sphere_bytes_writer
-            .write(
-                ui.elements
-                    .iter()
-                    .map(|u| u.value)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .unwrap();
-        queue.write_buffer(&self.slider_buffer, 0, &bytes);
+        // sphere_bytes_writer
+        //     .write(
+        //         ui.elements
+        //             .iter()
+        //             .map(|u| u.value)
+        //             .collect::<Vec<_>>()
+        //             .as_slice(),
+        //     )
+        //     .unwrap();
+        // queue.write_buffer(&self.slider_buffer, 0, &bytes);
     }
 }
 
@@ -260,42 +265,42 @@ impl UIElements {
 
         let width = 0.5;
         let height = 0.05;
-        let elements: Vec<_> = (0..10)
-            .map(|i| {
-                let slider_buffer = create_float_buffer("slider", device, 0.0);
-                let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
-                let vertices = Vertex::rect(
-                    Vector2 {
-                        x: -0.7,
-                        y: 0.8 - i as f32 / 10.0,
-                    },
-                    width,
-                    height,
-                    0.001,
-                );
-                let mut vertex_bytes = vec![];
-                let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
-                vertex_bytes_writer
-                    .write_iter(vertices.iter().cloned())
-                    .unwrap();
-                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("vertex buffer"),
-                    contents: &vertex_bytes[..],
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-                UIElement {
-                    vertices: vertex_buffer,
-                    bind_group,
-                    slider_buffer,
-                    value: 0.5,
-                    dimensions: (width, height),
-                    center: (-0.7, 0.8 - i as f32 / 10.0),
-                }
-            })
-            .collect();
+        // let elements: Vec<_> = (0..10)
+        //     .map(|i| {
+        //         let slider_buffer = create_float_buffer("slider", device, 0.0);
+        //         let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
+        //         let vertices = Vertex::rect(
+        //             Vector2 {
+        //                 x: -0.7,
+        //                 y: 0.8 - i as f32 / 10.0,
+        //             },
+        //             width,
+        //             height,
+        //             0.001,
+        //         );
+        //         let mut vertex_bytes = vec![];
+        //         let mut vertex_bytes_writer = crevice::std430::Writer::new(&mut vertex_bytes);
+        //         vertex_bytes_writer
+        //             .write_iter(vertices.iter().cloned())
+        //             .unwrap();
+        //         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        //             label: Some("vertex buffer"),
+        //             contents: &vertex_bytes[..],
+        //             usage: wgpu::BufferUsages::VERTEX,
+        //         });
+        //         UIElement {
+        //             vertices: vertex_buffer,
+        //             bind_group,
+        //             slider_buffer,
+        //             value: 0.5,
+        //             dimensions: (width, height),
+        //             center: (-0.7, 0.8 - i as f32 / 10.0),
+        //         }
+        //     })
+        //     .collect();
         Self {
             pipeline,
-            elements,
+            elements: vec![],
             hidden: true,
             selected: 0,
         }

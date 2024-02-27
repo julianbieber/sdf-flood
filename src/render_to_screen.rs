@@ -25,21 +25,48 @@ pub fn render_to_screen(
     fft: &Arc<Mutex<Vec<f32>>>,
 ) {
     let event_loop = EventLoop::new().unwrap();
-    let mut video_modes: Vec<_> = event_loop
-        .available_monitors()
-        .next()
-        .unwrap()
-        .video_modes()
-        .collect();
-    video_modes.sort_by_key(|a| a.size().height * a.size().width);
-    let window_mode = video_modes.into_iter().last().unwrap().clone();
-    dbg!(&window_mode);
-    let window = Arc::new(
-        WindowBuilder::new()
-            .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
-            .build(&event_loop)
-            .unwrap(),
-    );
+
+    cfg_if::cfg_if! {
+                if #[cfg(target_arch = "wasm32")] {
+                    use winit::dpi::PhysicalSize;
+        use winit::dpi::LogicalSize;
+                    let mut window = WindowBuilder::new()
+                     // .with_inner_size(PhysicalSize::new(450, 400))
+                     // .with_min_inner_size(LogicalSize::new(1.0, 1.0))
+                      .build(&event_loop)
+                     .unwrap();
+
+                    use winit::platform::web::WindowExtWebSys;
+    let canvas = window.canvas().expect("Couldn't get canvas");
+                canvas.style().set_css_text("height: 100%; width: 100%;");
+                // On wasm, append the canvas to the document body
+                web_sys::window()
+                    .and_then(|win| win.document())
+                    .and_then(|doc| doc.body())
+                    .and_then(|body| body.append_child(&canvas).ok())
+                    .expect("couldn't append canvas to document body");                 dbg!(window.inner_size());
+                let window = Arc::new(window);
+                } else {
+                    let window = {
+                        let mut video_modes: Vec<_> = event_loop
+                            .available_monitors()
+                            .next()
+                            .unwrap()
+                            .video_modes()
+                            .collect();
+                        video_modes.sort_by_key(|a| a.size().height * a.size().width);
+                        let window_mode = video_modes.into_iter().last().unwrap().clone();
+                        dbg!(&window_mode);
+                        Arc::new(
+                            WindowBuilder::new()
+                                .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
+                                .build(&event_loop)
+                                .unwrap(),
+                        )
+                    };
+                }
+            }
+
     let mut fps = Fps::new();
     let mut input_state = InputState {
         mouse_position: (0.0, 0.0),
@@ -47,6 +74,9 @@ pub fn render_to_screen(
         is_clicked: false,
     };
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        #[cfg(target_family = "wasm")]
+        backends: Backends::GL,
+        #[cfg(all(unix, not(target_family = "wasm")))]
         backends: if pi { Backends::GL } else { Backends::VULKAN },
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
         flags: InstanceFlags::empty(),
@@ -59,14 +89,16 @@ pub fn render_to_screen(
         surface,
         None,
         WindowSize {
-            width: window.inner_size().width,
-            height: window.inner_size().height,
+            width: 1920,
+            height: 1080,
         },
         fragment_shader,
         fft,
         srgb,
         pi,
     ));
+
+    log::warn!("after create");
     event_loop
         .run(move |event, elwt| match event {
             Event::WindowEvent {
@@ -117,7 +149,8 @@ pub fn render_to_screen(
                         dbg!(fps.fps());
                     }
                     if input_state.is_clicked {
-                        render_state.report_click(input_state.relative_mouse(&window_mode));
+                        // #[cfg(all(unix, not(target_family = "wasm")))]
+                        // render_state.report_click(input_state.relative_mouse(&window_mode));
                     }
                     match render_state.render(None, None) {
                         Ok(_) => window.request_redraw(),
