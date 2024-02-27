@@ -93,7 +93,14 @@ float upper_ring(vec2 p, vec2 n, float r, float th) {
     return max(abs(length(p) - r) - th * 0.5,
         length(vec2(p.x, max(0.0, abs(r - p.y) - th * 0.5))) * sign(p.x));
 }
-
+float egg(vec2 p, float ra, float rb) {
+    const float k = sqrt(3.0);
+    p.x = abs(p.x);
+    float r = ra - rb;
+    return ((p.y < 0.0) ? length(vec2(p.x, p.y)) - r :
+    (k * (p.x + r) < p.y) ? length(vec2(p.x, p.y - k * r)) :
+    length(vec2(p.x + r, p.y)) - 2.0 * r) - rb;
+}
 SceneSample julian_map(vec2 p) {
     float eye_left_dist = eye(p + vec2(0.2, 0.0), 0.1, 0.05, 0.1, 0.0);
     SceneSample eye_left = SceneSample(eye_left_dist, 1);
@@ -121,20 +128,49 @@ SceneSample julian_map(vec2 p) {
     // mouth
 
     // upper ring
-    float upper_mouth_dist = upper_ring((p + vec2(0.0, 0.3)) / 0.05, vec2(PI), TAU * 0.4, 0.7);
+    float upper_mouth_dist = upper_ring((p + vec2(0.0, 0.3)) / 0.05, vec2(sin(0.2), cos(0.2)), 0.6, 0.5);
     SceneSample upper_mouth = SceneSample(upper_mouth_dist, 4);
-    float lower_mouth_dist = nose_ring((p + vec2(0.0, 0.3)) / 0.05, vec2(1.5), 0.6, 0.7);
+    float lower_mouth_dist = nose_ring((p + vec2(0.0, 0.28)) / 0.04, vec2(sin(-0.2), cos(-0.2)), 0.6, 0.7);
     SceneSample lower_mouth = SceneSample(lower_mouth_dist, 4);
-    // lower ring
-    // center
+    // missing center
 
     SceneSample mouth = combine(upper_mouth, lower_mouth);
 
-    return combine(combine(eye, nose), mouth);
+    // head
+    float head_dist = egg(p, 0.35, 0.25);
+    SceneSample head = SceneSample(head_dist, 5);
+
+    return combine(combine(combine(eye, nose), mouth), head);
     // return upper_mouth;
 }
 
+float wave(vec2 p, float tb, float ra) {
+    tb = 3.1415927 * 5.0 / 6.0 * max(tb, 0.0001);
+    vec2 co = ra * vec2(sin(tb), cos(tb));
+
+    p.x = abs(mod(p.x, co.x * 4.0) - co.x * 2.0);
+
+    vec2 p1 = p;
+    vec2 p2 = vec2(abs(p.x - 2.0 * co.x), -p.y + 2.0 * co.y);
+    float d1 = ((co.y * p1.x > co.x * p1.y) ? length(p1 - co) : abs(length(p1) - ra));
+    float d2 = ((co.y * p2.x > co.x * p2.y) ? length(p2 - co) : abs(length(p2) - ra));
+
+    return min(d1, d2);
+}
+
 vec3 julian_color(SceneSample s, vec2 p) {
+    float wave_dist = 1.0;
+    if (p.x > 0.0) {
+        wave_dist = wave(rot(vec2(abs(p.x), p.y), PI / 1.3), 0.3, 0.3);
+    } else {
+        wave_dist = wave(rot(vec2(abs(p.x), p.y), PI / 2.3), 0.3, 0.3);
+    }
+    if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
+        if (wave_dist < 0.001) {
+            return vec3(0.1);
+        }
+        return vec3(wave(p, 1.0, 1.0));
+    }
     if (s.index == 1 && s.closest_distance < 0.0) {
         return vec3(1.0, 0.0, 0.0);
     }
@@ -147,12 +183,19 @@ vec3 julian_color(SceneSample s, vec2 p) {
     if (s.index == 4 && s.closest_distance < 0.0) {
         return vec3(1.0, 0.0, 0.0);
     }
+    if (s.index == 5 && s.closest_distance < 0.0) {
+        return vec3(108.0 / 255.0, 70.0 / 255.0, 117.0 / 255.0);
+    }
 
-    return vec3(uv - vec2(0.5, 0.5), 0.0);
+    if (abs(0.1 / p.x) - 1.0 > p.y && p.y < 0.2) {
+        return vec3(108.0 / 255.0, 70.0 / 255.0, 117.0 / 255.0) * mix(0.6, 4.0, length(p) - 0.4);
+    }
+
+    return vec3(wave(p, 1.0, 1.0));
 }
 
 vec4 julian(vec2 p) {
-    SceneSample s = julian_map(p);
+    SceneSample s = julian_map(p - vec2(0.0, 0.1));
     return vec4(julian_color(s, p), 1.0);
 }
 
