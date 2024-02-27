@@ -14,7 +14,7 @@ use crate::renderable::{MainDisplay, UIElements};
 pub struct State<'a> {
     render_state: RenderState<'a>,
     main_display: MainDisplay,
-    ui: UIElements,
+    // ui: UIElements,
 }
 
 enum SurfaceTypes<'a> {
@@ -69,7 +69,7 @@ impl<'a> RenderState<'a> {
                         &wgpu::DeviceDescriptor {
                             label: Some("device"),
                             required_features: wgpu::Features::empty(),
-                            required_limits: wgpu::Limits::default(),
+                            required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
                         },
                         None,
                     )
@@ -84,8 +84,13 @@ impl<'a> RenderState<'a> {
                     present_mode: wgpu::PresentMode::Fifo,
                     alpha_mode: surface_caps.alpha_modes[0],
                     view_formats: vec![],
+                    desired_maximum_frame_latency: 2,
                 };
+                let w = size.width;
+                let h = size.height;
+                log::warn!("after configure {w:?} {h:?}");
                 surface.configure(&device, &config);
+                log::warn!("after configure");
                 (
                     RenderState {
                         surface: SurfaceTypes::Window(surface),
@@ -145,7 +150,7 @@ impl<'a> RenderState<'a> {
     fn render(
         &mut self,
         main_display: &MainDisplay,
-        ui: &UIElements,
+        // ui: &UIElements,
         file_render_view: Option<TextureView>,
         file_render_texture: Option<Texture>,
     ) -> Result<(), wgpu::SurfaceError> {
@@ -183,11 +188,11 @@ impl<'a> RenderState<'a> {
             });
 
             main_display.render(&mut render_pass);
-            ui.render(&mut render_pass);
+            // ui.render(&mut render_pass);
         }
 
-        main_display.update_buffers(&self.queue, ui);
-        ui.update_buffers(&self.queue);
+        main_display.update_buffers(&self.queue);
+        // ui.update_buffers(&self.queue);
         let ob = match &self.surface {
             SurfaceTypes::Window(_) => None,
             SurfaceTypes::File() => {
@@ -271,12 +276,12 @@ impl<'a> State<'a> {
             render_state.format,
             pi,
         );
-        let ui = UIElements::new(&render_state.device, render_state.format);
+        // let ui = UIElements::new(&render_state.device, render_state.format);
 
         (
             Self {
                 main_display,
-                ui,
+                // ui,
                 render_state,
             },
             file_info,
@@ -290,7 +295,7 @@ impl<'a> State<'a> {
     ) -> Result<(), wgpu::SurfaceError> {
         self.render_state.render(
             &self.main_display,
-            &self.ui,
+            // &self.ui,
             file_render_view,
             file_render_texture,
         )
@@ -309,25 +314,25 @@ impl<'a> State<'a> {
 
     pub fn report_just_pressed(&mut self, key: Key) {
         match key {
-            Key::Character(s) if s == "m" => self.ui.toggle_hidden(),
-            Key::Character(s) if s == "0" => self.ui.select(0),
-            Key::Character(s) if s == "1" => self.ui.select(1),
-            Key::Character(s) if s == "2" => self.ui.select(2),
-            Key::Character(s) if s == "3" => self.ui.select(3),
-            Key::Character(s) if s == "4" => self.ui.select(4),
-            Key::Character(s) if s == "5" => self.ui.select(5),
-            Key::Character(s) if s == "6" => self.ui.select(6),
-            Key::Character(s) if s == "7" => self.ui.select(7),
-            Key::Character(s) if s == "8" => self.ui.select(8),
-            Key::Character(s) if s == "9" => self.ui.select(9),
-            Key::Named(NamedKey::ArrowUp) => self.ui.increment(),
-            Key::Named(NamedKey::ArrowDown) => self.ui.decrement(),
+            // Key::Character(s) if s == "m" => self.ui.toggle_hidden(),
+            // Key::Character(s) if s == "0" => self.ui.select(0),
+            // Key::Character(s) if s == "1" => self.ui.select(1),
+            // Key::Character(s) if s == "2" => self.ui.select(2),
+            // Key::Character(s) if s == "3" => self.ui.select(3),
+            // Key::Character(s) if s == "4" => self.ui.select(4),
+            // Key::Character(s) if s == "5" => self.ui.select(5),
+            // Key::Character(s) if s == "6" => self.ui.select(6),
+            // Key::Character(s) if s == "7" => self.ui.select(7),
+            // Key::Character(s) if s == "8" => self.ui.select(8),
+            // Key::Character(s) if s == "9" => self.ui.select(9),
+            // Key::Named(NamedKey::ArrowUp) => self.ui.increment(),
+            // Key::Named(NamedKey::ArrowDown) => self.ui.decrement(),
             _ => (),
         }
     }
 
     pub fn report_click(&mut self, position: (f32, f32)) {
-        self.ui
-            .click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))
+        // self.ui
+        //     .click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))
     }
 }

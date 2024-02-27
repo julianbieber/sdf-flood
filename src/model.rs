@@ -78,6 +78,9 @@ pub fn create_float_buffer(name: &str, device: &Device, time: f32) -> Buffer {
     let mut bytes = vec![];
     let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
     sphere_bytes_writer.write(&time).unwrap();
+    sphere_bytes_writer.write(&0.0).unwrap();
+    sphere_bytes_writer.write(&0.0).unwrap();
+    sphere_bytes_writer.write(&0.0).unwrap();
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some(name),
         contents: &bytes[..],
