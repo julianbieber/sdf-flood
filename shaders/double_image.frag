@@ -174,22 +174,70 @@ SceneSample julian_map(vec2 p) {
     // return upper_mouth;
 }
 
+vec3 hash( vec3 p )      // this hash is not production ready, please
+{                        // replace this by something better
+	p = vec3( dot(p,vec3(127.1,311.7, 74.7)),
+			  dot(p,vec3(269.5,183.3,246.1)),
+			  dot(p,vec3(113.5,271.9,124.6)));
+
+	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
+}
+
+float noise( vec3 x )
+{
+    // grid
+    vec3 p = floor(x);
+    vec3 w = fract(x);
+    
+    // quintic interpolant
+    vec3 u = w*w*w*(w*(w*6.0-15.0)+10.0);
+
+    
+    // gradients
+    vec3 ga = hash( p+vec3(0.0,0.0,0.0) );
+    vec3 gb = hash( p+vec3(1.0,0.0,0.0) );
+    vec3 gc = hash( p+vec3(0.0,1.0,0.0) );
+    vec3 gd = hash( p+vec3(1.0,1.0,0.0) );
+    vec3 ge = hash( p+vec3(0.0,0.0,1.0) );
+    vec3 gf = hash( p+vec3(1.0,0.0,1.0) );
+    vec3 gg = hash( p+vec3(0.0,1.0,1.0) );
+    vec3 gh = hash( p+vec3(1.0,1.0,1.0) );
+    
+    // projections
+    float va = dot( ga, w-vec3(0.0,0.0,0.0) );
+    float vb = dot( gb, w-vec3(1.0,0.0,0.0) );
+    float vc = dot( gc, w-vec3(0.0,1.0,0.0) );
+    float vd = dot( gd, w-vec3(1.0,1.0,0.0) );
+    float ve = dot( ge, w-vec3(0.0,0.0,1.0) );
+    float vf = dot( gf, w-vec3(1.0,0.0,1.0) );
+    float vg = dot( gg, w-vec3(0.0,1.0,1.0) );
+    float vh = dot( gh, w-vec3(1.0,1.0,1.0) );
+	
+    // interpolation
+    return va + 
+           u.x*(vb-va) + 
+           u.y*(vc-va) + 
+           u.z*(ve-va) + 
+           u.x*u.y*(va-vb-vc+vd) + 
+           u.y*u.z*(va-vc-ve+vg) + 
+           u.z*u.x*(va-vb-ve+vf) + 
+           u.x*u.y*u.z*(-va+vb+vc-vd+ve-vf-vg+vh);
+}
+
+vec3 background_hair_tex(vec2 p) {
+    vec3 p3 = vec3(p, 0.0);
+    float w = 1.0 / wave(fract(p+noise(p3*20.0) + (u.time)), 0.2, 0.1)/10.0 + noise(p3 + vec3(0.0, 0.0, u.time));
+    return w * vec3(148.0/255.0,0.0/255.0,211.0/255.0);
+}
+
 vec3 julian_color(SceneSample s, vec2 p) {
     if (s.index == 6 && s.closest_distance < 0.002) {
         return vec3(0.4 + (1.0 / (s.closest_distance + 0.4)));
     }
-    float wave_dist = 1.0;
-    // if (p.x > 0.0) {
-    //     wave_dist = wave(rot(vec2(abs(p.x), p.y), PI / 1.3), 0.3, 0.3);
-    // } else {
-    //     wave_dist = wave(rot(vec2(abs(p.x), p.y), PI / 2.3), 0.3, 0.3);
-    // }
-    // if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
-    //     if (wave_dist < 0.001) {
-    //         return vec3(0.1);
-    //     }
-    //     return vec3(wave(p, 1.0, 1.0));
-    // }
+    s.closest_distance += (noise(vec3(p*1000.0, 0.0))- 0.5)*0.01;
+    if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
+        return background_hair_tex(p);
+    }
     if (s.index == 1 && s.closest_distance < 0.0) {
         return vec3(1.0, 0.0, 0.0);
     }
@@ -210,12 +258,12 @@ vec3 julian_color(SceneSample s, vec2 p) {
         return vec3(108.0 / 255.0, 70.0 / 255.0, 117.0 / 255.0) * mix(0.6, 4.0, length(p) - 0.4);
     }
 
-    return vec3(0.2);
+    return background_hair_tex(p);
 }
 
 vec4 julian(vec2 p) {
     SceneSample s = julian_map(p - vec2(0.0, 0.1));
-    return vec4(julian_color(s, p), 1.0);
+    return vec4(julian_color(s, p) + (noise(vec3(rot(p, u.time * 0.1), 0.1)) - 0.5), 1.0);
 }
 
 void main() {
