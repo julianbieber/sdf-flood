@@ -127,6 +127,25 @@ float wave(vec2 p, float tb, float ra) {
     return min(d1, d2);
 }
 
+float moon(vec2 p, float d, float ra, float rb ) {
+    p = rot(p, PI*1.5);
+    p.y = abs(p.y);
+    float a = (ra*ra - rb*rb + d*d)/(2.0*d);
+    float b = sqrt(max(ra*ra-a*a,0.0));
+    if( d*(p.x*b-p.y*a) > d*d*max(b-p.y,0.0) )
+          return length(p-vec2(a,b));
+    return max( (length(p          )-ra),
+               -(length(p-vec2(d,0))-rb));
+}
+
+vec2 swirl(vec2 p) {
+	float swirlFactor = 3.0+0.3*(sin(u.time*0.1+0.22)*10.0-1.5);
+	float radius = length(p);
+	float angle = atan(p.y, p.x);
+	float inner = angle-cos(radius*swirlFactor);
+	return vec2(radius * cos(inner), radius*sin(inner));
+}
+
 SceneSample julian_map(vec2 p) {
     float eye_left_dist = eye(p + vec2(0.2, 0.0), 0.1, 0.05, 0.1, 0.0);
     SceneSample eye_left = SceneSample(eye_left_dist, 1);
@@ -166,11 +185,14 @@ SceneSample julian_map(vec2 p) {
     float head_dist = egg(p, 0.35, 0.25);
     SceneSample head = SceneSample(head_dist, 5);
 
-    float hair_dist = wave(p, 0.4, 0.2);
+    float hair_dist = wave(swirl(p), 0.4, 0.2);
     SceneSample hair = SceneSample(hair_dist, 6);
 
+    float hair_line_dist = moon(p + vec2(0.0, -0.1), 0.3, 0.45, 0.4);
+    SceneSample hair_line = SceneSample(hair_line_dist, 7);
+
     // return hair;
-    return combine(hair, combine(combine(combine(eye, nose), mouth), head));
+    return combine(hair, combine(hair_line, combine(combine(combine(eye, nose), mouth), head)));
     // return upper_mouth;
 }
 
@@ -225,6 +247,7 @@ float noise( vec3 x )
 }
 
 vec3 background_hair_tex(vec2 p) {
+    p = swirl(p);
     vec3 p3 = vec3(p, 0.0);
     float w = 1.0 / wave(fract(p+noise(p3*20.0) + (u.time)), 0.2, 0.1)/10.0 + noise(p3 + vec3(0.0, 0.0, u.time));
     return w * vec3(148.0/255.0,0.0/255.0,211.0/255.0);
@@ -235,9 +258,9 @@ vec3 julian_color(SceneSample s, vec2 p) {
         return vec3(0.4 + (1.0 / (s.closest_distance + 0.4)));
     }
     s.closest_distance += (noise(vec3(p*1000.0, 0.0))- 0.5)*0.01;
-    if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
-        return background_hair_tex(p);
-    }
+    // if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
+    //     return background_hair_tex(p);
+    // }
     if (s.index == 1 && s.closest_distance < 0.0) {
         return vec3(1.0, 0.0, 0.0);
     }
@@ -252,6 +275,9 @@ vec3 julian_color(SceneSample s, vec2 p) {
     }
     if (s.index == 5 && s.closest_distance < 0.0) {
         return vec3(108.0 / 255.0, 70.0 / 255.0, 117.0 / 255.0);
+    }
+    if (s.index == 7 && s.closest_distance < 0.0) {
+        return background_hair_tex(p)*1.1;
     }
 
     if (abs(0.1 / p.x) - 1.0 > p.y && p.y < 0.2) {
