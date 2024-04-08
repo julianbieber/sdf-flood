@@ -19,6 +19,7 @@ layout(binding = 2) readonly buffer SliderParameters {
 struct SceneSample {
     float closest_distance;
     int index;
+    vec3 id;
 };
 
 struct RayEnd {
@@ -123,7 +124,7 @@ float fbm(vec2 x, float H) {
     {
         float f = pow(1.2, float(i));
         float a = pow(f, -H);
-        t += a * smoothVoronoi(f * x);
+        t += a * noise(f * x);
     }
     return t;
     // return voronoise(x , 1.0, 1.0) * 1.0;
@@ -139,27 +140,55 @@ float surface(vec3 p, float dimension) {
     return plane;
 }
 
+float sky_distance(vec3 p, vec3 id) {
+    return sphere(p, vec3(noise(id.zy)*4.0, noise(id.xy)*5.0, noise(id.yz)*3.0) , noise(id.xz));
+    // return sdPlane(p, vec3(0.0, -1.0, 0.0), 21.0);
+}
+
 SceneSample scene(vec3 p, float dimension) {
-    return SceneSample(surface(p+vec3(u.time,0.0,u.time), dimension), 1);
+    SceneSample ground = SceneSample(surface(p + vec3(u.time * (dimension * 20.0 + 1.0), 0.0, u.time), dimension), 1, vec3(0));
+    float s = 15.0;
+    vec3 id = round(p / s);
+    vec3 r = p - s * id;
+    float d = 1e20;
+    vec3 o = sign(p - s * id);
+    float boundary = sdPlane(p, vec3(0.0, -1.0, 0.0), 27.0);
+    for (int j = 0; j < 3; j++)
+        for (int i = 0; i < 3; i++)
+            for (int k = 0; k < 3; k++)
+            {
+                vec3 rid = id + vec3(i, j, k) * o;
+                vec3 r = p - s * rid;
+                d = min(d, sky_distance(r, rid));
+            }
+
+    SceneSample sky = SceneSample(max(d, boundary), 2, id);
+
+    return combine(ground, sky);
+}
+SceneSample fastscene(vec3 p, float dimension) {
+    SceneSample ground = SceneSample(surface(p + vec3(u.time * (dimension * 20.0 + 1.0), 0.0, u.time), dimension), 1, vec3(0));
+    return ground;
 }
 
 BlackHoleDistance b_h_scene(vec3 p) {
-    vec3 center = vec3(cos(u.time * 0.5) * 2.0, sin(u.time) * 3.0 + 10.0, (abs(sin(u.time * 0.3)) * 3.0) + 30.0);
-    return BlackHoleDistance(center, sphere(p, center, 5.0), abs(sin(u.time * 0.22))*20.0);
+    vec3 center = vec3(cos(u.time * 0.25) * 4.0, sin(u.time * 0.03) * 30.0 + 10.0, (abs(sin(u.time * 0.3)) * 3.0) + 30.0);
+    float outer = abs(sin(u.time * 0.22)) * 20.0;
+    return BlackHoleDistance(center, sphere(p, center, min(5.0, outer * 0.8)), outer);
 }
 
 float scene_f(vec3 p, float dimension) {
-    return scene(p , dimension).closest_distance;
+    return fastscene(p, dimension).closest_distance;
 }
 
-vec3 normal(vec3 p, float dimension) // for function f(p)
-{
+vec3 normal(vec3 p, float dimension) {
     const float eps = 0.0001; // or some other value
     const vec2 h = vec2(eps, 0);
     return normalize(vec3(scene_f(p + h.xyy, dimension) - scene_f(p - h.xyy, dimension),
             scene_f(p + h.yxy, dimension) - scene_f(p - h.yxy, dimension),
             scene_f(p + h.yyx, dimension) - scene_f(p - h.yyx, dimension)));
 }
+
 float fov_factor() {
     return tan(FOV / 2.0 * PI / 180.0);
 }
@@ -177,25 +206,25 @@ RayEnd follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
         if (b.distance < 0.01) {
             dimension += 1.0;
         }
+        float t = s.closest_distance;
         if (b.distance < b.effect_radius) {
-            float scale =  b.distance / b.effect_radius  ;
+            float scale = smoothstep(0.6, 0.3, (b.distance / b.effect_radius));
             direction = normalize(mix(direction, normalize(b.center - p), (scale)));
         }
         if (traveled >= max_dist) {
             break;
         }
-        traveled += s.closest_distance;
+        traveled += t;
     }
 
-    return RayEnd(SceneSample(traveled, -1), start + direction * traveled, dimension);
+    return RayEnd(SceneSample(traveled, -1, vec3(0)), start + direction * traveled, dimension);
 }
 vec2 circle(float angle) {
     return vec2(cos(angle), sin(angle));
 }
 
-vec4 resolve_color(int index, vec3 p, float dimension) {
-    if (index == 1) {
-
+vec4 resolve_color(int index, vec3 p, float dimension, vec3 id) {
+    if (index == 1 && dimension == 0) {
         vec3 n = normal(p, dimension);
         vec2 sun = 10.0 * circle(u.time * 0.1);
         vec3 white = vec3(1.0);
@@ -203,7 +232,12 @@ vec4 resolve_color(int index, vec3 p, float dimension) {
         float f = (p.y) * 0.02;
         float light = dot(n, vec3(0.0, sun.x + 5.0, sun.y));
         vec3 inter = (f * white + (1.0 - f) * blue) * light;
-        return vec4(inter, 1.0);
+        // vec3 noise_factor = vec3(noise(p.xy * dimension), noise(p.xy * dimension), noise(p.xy * dimension));
+        vec3 noise_factor = vec3(0.0);
+        return vec4(inter + noise_factor, 1.0);
+    }
+    if (index == 2) {
+        return vec4(vec3(noise(p.xz), noise(p.xz * 2.03), noise(p.xz * 2.02)), 1.0);
     }
 
     return vec4(0);
@@ -214,7 +248,7 @@ vec4 render(vec3 eye, vec3 ray) {
     if (end.s.index == -1) {
         return vec4(0.0);
     }
-    vec4 color = resolve_color(end.s.index, end.current_position, end.dimension);
+    vec4 color = resolve_color(end.s.index, end.current_position, end.dimension, end.s.id);
     return color;
 }
 
