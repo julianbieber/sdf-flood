@@ -22,8 +22,129 @@ float rand2(vec2 x) {
     return fract(sin(x.x * 2382.0 * x.y * 1786.0 + u.time * sin(u.time * 0.2)));
 }
 
+float sdEgg(in vec2 p, in float ra, in float rb) {
+    const float k = sqrt(3.0);
+
+    p.x = abs(p.x);
+
+    float r = ra - rb;
+
+    return ((p.y == 0.0) ? length(vec2(p.x, p.y)) - r :
+    (k * (p.x + r) < p.y) ? length(vec2(p.x, p.y - k * r)) :
+    length(vec2(p.x + r, p.y)) - 2.0 * r) - rb;
+}
+
 vec4 yasi(vec2 p) {
-    return vec4(1.0);
+
+    p = p*2.0;
+
+    // background
+    vec3 col = vec3(1.0);
+    float pi = 3.14159;
+    float x = p.x + 0.5;
+    float y = p.y + 0.5;
+    for (float i = 0.0; i < 4.0; i += 1.00) {
+        x = x + i * cos(0.0 + y + cos(1.0 + u.time * 0.1 + pi * x));
+        y = y + i * cos(2.0 + x + cos(3.0 + u.time * 0.1 + pi * y));
+    }
+
+    float d1 = length(vec2(x, y));
+    col = vec3(0.45, 0.25, 0.61);
+    if (d1 < 4.5 && d1 > 0.0) {
+        col = vec3(0.4, 0.20, 0.42);
+    }
+    if (d1 < 10.0 && d1 > 6.5) {
+        col = vec3(0.4, 0.25, 0.45);
+    }
+    if (d1 < 0.1 && d1 > 0.0) {
+        col = vec3(0.94, 0.77, 0.53);
+    }
+
+    //neck
+    if (abs(p.x) < 0.35 && p.y < 0.0) {
+        col = vec3(0.83, 0.67, 0.76);
+    }
+
+    //inside face
+
+    float ra = 0.5;
+    float rb = ra * (0.55 + 0.45 * cos(1.0));
+    float d = sdEgg(p + vec2(0.0, 0.2), ra, rb);
+
+    col *= 1.0 - exp(-10.0 * abs(d)) * (1.0 - p.y);
+    if (d < 0.1) {
+        col = vec3(0.83, 0.67, 0.76);
+    }
+
+    //left eye
+    if (length(p - vec2(0.3, -0.2)) < 0.2 && length(p - vec2(0.25, -0.0)) < 0.2)
+    {
+        col = vec3(1.0, 1.0, 1.0);
+
+        if (length(p - vec2(0.275, -0.07)) < 0.1) {
+            col = vec3(0.94, 0.77, 0.53);
+            if (length(p - vec2(0.3, -0.04)) < 0.02) {
+                col += vec3(0.1, 0.1, 0.1) * (1.0 - length(p - vec2(0.3, -0.04)) / 0.02);
+            }
+        }
+    }
+    if (length(p - vec2(0.29, -0.1)) < 0.2 && length(p - vec2(0.3, -0.12)) > 0.2 && length(p - vec2(0.28, -0.1)) < 0.2)
+    {
+        col = vec3(0.4, 0.20, 0.42);
+    }
+
+    //right eye
+    if (length(p - vec2(-0.3, -0.2)) < 0.2 && length(p - vec2(-0.25, -0.0)) < 0.2)
+    {
+        col = vec3(1.0, 1.0, 1.0);
+
+        if (length(p - vec2(-0.275, -0.07)) < 0.1) {
+            col = vec3(0.94, 0.77, 0.53);
+            if (length(p - vec2(-0.25, -0.04)) < 0.02) {
+                col += vec3(0.1, 0.1, 0.1) * (1.0 - length(p - vec2(-0.25, -0.04)) / 0.02);
+            }
+        }
+    }
+    if (length(p - vec2(-0.29, -0.1)) < 0.2 && length(p - vec2(-0.3, -0.12)) > 0.2 && length(p - vec2(-0.28, -0.1)) < 0.2)
+    {
+        col = vec3(0.4, 0.20, 0.42);
+    }
+
+    //nosering
+    if (length(p - vec2(-0.05, -0.32)) < 0.02)
+    {
+        col = vec3(0.4, 0.20, 0.42);
+    }
+    if (length(p - vec2(0.05, -0.32)) < 0.02)
+    {
+        col = vec3(0.4, 0.20, 0.42);
+    }
+
+    if (length(p - vec2(-0.0, -0.32)) < 0.05 && length(p - vec2(-0.0, -0.32)) > 0.04)
+    {
+        if (p.y < -0.32) {
+            col = vec3(0.94, 0.77, 0.53);
+        }
+    }
+    //mouth
+
+    if (p.y < -0.2 * p.x * p.x - 0.5 && p.y > -0.2 * p.x * p.x - 0.515) {
+        if (abs(p.x) < 0.22) {
+            col = vec3(0.4, 0.20, 0.42);
+        }
+    }
+    if (p.y < 0.1 * p.x * p.x - 0.57 && p.y > 0.1 * p.x * p.x - 0.5815) {
+        if (abs(p.x) < 0.1) {
+            col = vec3(0.4, 0.20, 0.42);
+        }
+    }
+
+    // forgorund
+
+    if (d1 < 2.5 && d1 > 1.8) {
+        col = vec3(0.96, 0.85, 0.88);
+    }
+    return vec4(col, 1.0);
 }
 
 struct SceneSample {
@@ -127,23 +248,23 @@ float wave(vec2 p, float tb, float ra) {
     return min(d1, d2);
 }
 
-float moon(vec2 p, float d, float ra, float rb ) {
-    p = rot(p, PI*1.5);
+float moon(vec2 p, float d, float ra, float rb) {
+    p = rot(p, PI * 1.5);
     p.y = abs(p.y);
-    float a = (ra*ra - rb*rb + d*d)/(2.0*d);
-    float b = sqrt(max(ra*ra-a*a,0.0));
-    if( d*(p.x*b-p.y*a) > d*d*max(b-p.y,0.0) )
-          return length(p-vec2(a,b));
-    return max( (length(p          )-ra),
-               -(length(p-vec2(d,0))-rb));
+    float a = (ra * ra - rb * rb + d * d) / (2.0 * d);
+    float b = sqrt(max(ra * ra - a * a, 0.0));
+    if (d * (p.x * b - p.y * a) > d * d * max(b - p.y, 0.0))
+        return length(p - vec2(a, b));
+    return max((length(p) - ra),
+        -(length(p - vec2(d, 0)) - rb));
 }
 
 vec2 swirl(vec2 p) {
-	float swirlFactor = 3.0+0.3*(sin(u.time*0.1+0.22)*10.0-1.5);
-	float radius = length(p);
-	float angle = atan(p.y, p.x);
-	float inner = angle-cos(radius*swirlFactor);
-	return vec2(radius * cos(inner), radius*sin(inner));
+    float swirlFactor = 3.0 + 0.3 * (sin(u.time * 0.1 + 0.22) * 10.0 - 1.5);
+    float radius = length(p);
+    float angle = atan(p.y, p.x);
+    float inner = angle - cos(radius * swirlFactor);
+    return vec2(radius * cos(inner), radius * sin(inner));
 }
 
 SceneSample julian_map(vec2 p) {
@@ -196,68 +317,67 @@ SceneSample julian_map(vec2 p) {
     // return upper_mouth;
 }
 
-vec3 hash( vec3 p )      // this hash is not production ready, please
-{                        // replace this by something better
-	p = vec3( dot(p,vec3(127.1,311.7, 74.7)),
-			  dot(p,vec3(269.5,183.3,246.1)),
-			  dot(p,vec3(113.5,271.9,124.6)));
+vec3 hash(vec3 p) // this hash is not production ready, please
+{ // replace this by something better
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+            dot(p, vec3(269.5, 183.3, 246.1)),
+            dot(p, vec3(113.5, 271.9, 124.6)));
 
-	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
+    return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
 }
 
-float noise( vec3 x )
+float noise(vec3 x)
 {
     // grid
     vec3 p = floor(x);
     vec3 w = fract(x);
-    
-    // quintic interpolant
-    vec3 u = w*w*w*(w*(w*6.0-15.0)+10.0);
 
-    
+    // quintic interpolant
+    vec3 u = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
+
     // gradients
-    vec3 ga = hash( p+vec3(0.0,0.0,0.0) );
-    vec3 gb = hash( p+vec3(1.0,0.0,0.0) );
-    vec3 gc = hash( p+vec3(0.0,1.0,0.0) );
-    vec3 gd = hash( p+vec3(1.0,1.0,0.0) );
-    vec3 ge = hash( p+vec3(0.0,0.0,1.0) );
-    vec3 gf = hash( p+vec3(1.0,0.0,1.0) );
-    vec3 gg = hash( p+vec3(0.0,1.0,1.0) );
-    vec3 gh = hash( p+vec3(1.0,1.0,1.0) );
-    
+    vec3 ga = hash(p + vec3(0.0, 0.0, 0.0));
+    vec3 gb = hash(p + vec3(1.0, 0.0, 0.0));
+    vec3 gc = hash(p + vec3(0.0, 1.0, 0.0));
+    vec3 gd = hash(p + vec3(1.0, 1.0, 0.0));
+    vec3 ge = hash(p + vec3(0.0, 0.0, 1.0));
+    vec3 gf = hash(p + vec3(1.0, 0.0, 1.0));
+    vec3 gg = hash(p + vec3(0.0, 1.0, 1.0));
+    vec3 gh = hash(p + vec3(1.0, 1.0, 1.0));
+
     // projections
-    float va = dot( ga, w-vec3(0.0,0.0,0.0) );
-    float vb = dot( gb, w-vec3(1.0,0.0,0.0) );
-    float vc = dot( gc, w-vec3(0.0,1.0,0.0) );
-    float vd = dot( gd, w-vec3(1.0,1.0,0.0) );
-    float ve = dot( ge, w-vec3(0.0,0.0,1.0) );
-    float vf = dot( gf, w-vec3(1.0,0.0,1.0) );
-    float vg = dot( gg, w-vec3(0.0,1.0,1.0) );
-    float vh = dot( gh, w-vec3(1.0,1.0,1.0) );
-	
+    float va = dot(ga, w - vec3(0.0, 0.0, 0.0));
+    float vb = dot(gb, w - vec3(1.0, 0.0, 0.0));
+    float vc = dot(gc, w - vec3(0.0, 1.0, 0.0));
+    float vd = dot(gd, w - vec3(1.0, 1.0, 0.0));
+    float ve = dot(ge, w - vec3(0.0, 0.0, 1.0));
+    float vf = dot(gf, w - vec3(1.0, 0.0, 1.0));
+    float vg = dot(gg, w - vec3(0.0, 1.0, 1.0));
+    float vh = dot(gh, w - vec3(1.0, 1.0, 1.0));
+
     // interpolation
-    return va + 
-           u.x*(vb-va) + 
-           u.y*(vc-va) + 
-           u.z*(ve-va) + 
-           u.x*u.y*(va-vb-vc+vd) + 
-           u.y*u.z*(va-vc-ve+vg) + 
-           u.z*u.x*(va-vb-ve+vf) + 
-           u.x*u.y*u.z*(-va+vb+vc-vd+ve-vf-vg+vh);
+    return va +
+        u.x * (vb - va) +
+        u.y * (vc - va) +
+        u.z * (ve - va) +
+        u.x * u.y * (va - vb - vc + vd) +
+        u.y * u.z * (va - vc - ve + vg) +
+        u.z * u.x * (va - vb - ve + vf) +
+        u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
 }
 
 vec3 background_hair_tex(vec2 p) {
     p = swirl(p);
     vec3 p3 = vec3(p, 0.0);
-    float w = 1.0 / wave(fract(p+noise(p3*20.0) + (u.time)), 0.2, 0.1)/10.0 + noise(p3 + vec3(0.0, 0.0, u.time));
-    return w * vec3(148.0/255.0,0.0/255.0,211.0/255.0);
+    float w = 1.0 / wave(fract(p + noise(p3 * 20.0) + (u.time)), 0.2, 0.1) / 10.0 + noise(p3 + vec3(0.0, 0.0, u.time));
+    return w * vec3(148.0 / 255.0, 0.0 / 255.0, 211.0 / 255.0);
 }
 
 vec3 julian_color(SceneSample s, vec2 p) {
     if (s.index == 6 && s.closest_distance < 0.002) {
         return vec3(0.4 + (1.0 / (s.closest_distance + 0.4)));
     }
-    s.closest_distance += (noise(vec3(p*1000.0, 0.0))- 0.5)*0.01;
+    s.closest_distance += (noise(vec3(p * 1000.0, 0.0)) - 0.5) * 0.01;
     // if (p.y > 0.2 && -1.0 * (pow(abs(p.x), 1.2)) + 0.3 < p.y) {
     //     return background_hair_tex(p);
     // }
@@ -277,7 +397,7 @@ vec3 julian_color(SceneSample s, vec2 p) {
         return vec3(108.0 / 255.0, 70.0 / 255.0, 117.0 / 255.0);
     }
     if (s.index == 7 && s.closest_distance < 0.0) {
-        return background_hair_tex(p)*1.1;
+        return background_hair_tex(p) * 1.1;
     }
 
     if (abs(0.1 / p.x) - 1.0 > p.y && p.y < 0.2) {
