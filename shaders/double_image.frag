@@ -382,10 +382,10 @@ vec3 julian_color(SceneSample s, vec2 p) {
     //     return background_hair_tex(p);
     // }
     if (s.index == 1 && s.closest_distance < 0.0) {
-        return vec3(1.0, 0.0, 0.0);
+        return vec3(0.94, 0.77, 0.53);
     }
     if (s.index == 2 && s.closest_distance < 0.0) {
-        return vec3(0.0, 1.0, 0.0);
+        return vec3(1.0);
     }
     if (s.index == 3 && s.closest_distance < 0.0) {
         return vec3(0.0, 0.0, 1.0);
