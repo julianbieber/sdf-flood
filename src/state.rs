@@ -259,6 +259,7 @@ impl<'a> State<'a> {
         size: WindowSize,
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
+        eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
         srgb: bool,
         pi: bool,
     ) -> (Self, Option<TextureView>, Option<Texture>) {
@@ -266,6 +267,7 @@ impl<'a> State<'a> {
             RenderState::new(instance, surface, size, srgb, format).await;
         let main_display = MainDisplay::new(
             fft.clone(),
+            eye_positions,
             &render_state.device,
             fragment_shader_s,
             render_state.format,

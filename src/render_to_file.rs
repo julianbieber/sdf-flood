@@ -21,6 +21,7 @@ pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<V
         },
         fragment_shader,
         fft,
+        Arc::new(Mutex::new(Vec::new())),
         srgb,
         false,
     )

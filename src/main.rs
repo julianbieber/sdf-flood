@@ -51,7 +51,14 @@ fn main() {
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
     match opt.image_path {
         Some(_) => pollster::block_on(render_to_file(opt.srgb, &fragment_shader, &o)),
-        None => render_to_screen(opt.fps, opt.pi, opt.srgb, &fragment_shader, &o),
+        None => render_to_screen(
+            opt.fps,
+            opt.pi,
+            opt.srgb,
+            &fragment_shader,
+            &o,
+            eye_positions,
+        ),
     }
     eye_join_handle.join().unwrap();
 }

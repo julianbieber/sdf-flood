@@ -94,3 +94,14 @@ pub fn create_float_vec_buffer(name: &str, device: &Device, fft: &[f32]) -> Buff
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
 }
+pub fn create_float_vec2_vec_buffer(name: &str, device: &Device, content: &[[f32; 2]]) -> Buffer {
+    let mint_content = content.iter().map(|s| mint::Point2::from_slice(s));
+    let mut bytes = vec![];
+    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+    sphere_bytes_writer.write_iter(mint_content).unwrap();
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some(name),
+        contents: &bytes[..],
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+    }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
+}

@@ -10,7 +10,7 @@ use wgpu::{
 };
 
 use crate::{
-    model::{create_float_buffer, create_float_vec_buffer, Vertex},
+    model::{create_float_buffer, create_float_vec2_vec_buffer, create_float_vec_buffer, Vertex},
     render_pipeline,
 };
 
@@ -18,6 +18,7 @@ pub struct MainDisplay {
     pub pipeline: RenderPipeline,
     pub time_start: Instant,
     pub fft: Arc<Mutex<Vec<f32>>>,
+    pub eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
     pub time_buffer: Buffer,
     pub fft_buffer: Buffer,
     pub slider_buffer: Buffer,
@@ -27,6 +28,7 @@ pub struct MainDisplay {
 impl MainDisplay {
     pub fn new(
         fft: Arc<Mutex<Vec<f32>>>,
+        eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
         device: &Device,
         fragment_shader: &str,
         format: TextureFormat,
@@ -81,17 +83,28 @@ impl MainDisplay {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
         let time_buffer = create_float_buffer("time", device, 0.0);
         let fft_lock = fft.lock().unwrap();
         let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
+        let eye_buffer = create_float_vec2_vec_buffer("eye", device, &[[-1.0, -1.0]]);
         drop(fft_lock);
         let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
         let bind_group = create_bind_group(
             device,
             &bind_group_layout,
-            &[&time_buffer, &fft_buffer, &slider_buffer],
+            &[&time_buffer, &fft_buffer, &slider_buffer, &eye_buffer],
         );
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -134,6 +147,7 @@ impl MainDisplay {
             vertices: vertex_buffer,
             bind_group,
             slider_buffer,
+            eye_positions,
         }
     }
 
