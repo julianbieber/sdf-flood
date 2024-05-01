@@ -8,6 +8,10 @@ layout (binding  = 0) uniform UniformParameters {
 layout (binding  = 1) readonly buffer fftBuffer{
     float v[];
 } fft;
+
+layout(binding = 3) readonly buffer eyeBuffer {
+    float v[];
+} eyes;
 layout (binding  = 2) readonly buffer SliderParameters{
     float v[];
 } sliders;

@@ -56,13 +56,13 @@ fn to_u8_0_1(f: f32) -> u8 {
     (f * 255.0).round_ties_even() as u8
 }
 
-fn to_float_n1_1(u: u8) -> f32 {
-    (to_float_0_1(u) - 0.5) * 2.0
-}
+// fn to_float_n1_1(u: u8) -> f32 {
+//     (to_float_0_1(u) - 0.5) * 2.0
+// }
 
-fn to_u8_n1_1(f: f32) -> u8 {
-    to_u8_0_1((f + 1.0) / 2.0)
-}
+// fn to_u8_n1_1(f: f32) -> u8 {
+//     to_u8_0_1((f + 1.0) / 2.0)
+// }
 
 fn identity(f: f32) -> f32 {
     f
@@ -98,13 +98,13 @@ fn detect_edges(image: &ImageBuffer<Rgb<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, 
     image::ImageBuffer::<Luma<u8>, _>::from_raw(image.width(), image.height(), b).unwrap()
 }
 
-fn binary_edge(f: f32) -> f32 {
-    if f > 0.3 && f < 0.8 {
-        1.0
-    } else {
-        0.0
-    }
-}
+// fn binary_edge(f: f32) -> f32 {
+//     if f > 0.3 && f < 0.8 {
+//         1.0
+//     } else {
+//         0.0
+//     }
+// }
 
 fn save_f32_luma(image: &ImageBuffer<Luma<f32>, Vec<f32>>, path: &str) {
     let eye_data: Vec<u8> = image.iter().map(|f| to_u8_0_1(*f)).collect();
@@ -138,7 +138,7 @@ fn eye_convolution_from_image() -> (Vec<f32>, u32, u32) {
     let png = ImageReader::open("eye.png").unwrap().decode().unwrap();
     let g = grayscale(&png);
     let v = grey_to_float(&g, convolution_pass);
-    (v.into_iter().cloned().collect(), v.width(), v.height())
+    (v.iter().cloned().collect(), v.width(), v.height())
 }
 
 fn euclidian_distance(a: [u8; 3], b: [u8; 3]) -> f32 {
@@ -188,7 +188,7 @@ fn filter_close_values(values: Vec<[u32; 2]>, threshold: f32) -> Vec<[u32; 2]> {
 
     for value in sorted_values.iter() {
         if filtered.is_empty()
-            || euclidian_distance_2(*value, sorted_values.last().unwrap().clone()) >= threshold
+            || euclidian_distance_2(*value, *sorted_values.last().unwrap()) >= threshold
         {
             filtered.push(*value);
         }
@@ -200,7 +200,6 @@ fn filter_close_values(values: Vec<[u32; 2]>, threshold: f32) -> Vec<[u32; 2]> {
 fn detect_eyes_in_edges(image: &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[u32; 2]> {
     let g = grey_to_float(image, threshold);
     save_f32_luma(&g, "after_conversion.png");
-    let s = 32 as usize;
     // let circel = create_circle_convolution(s, 0.3, 0.4, 0.05);
     // save_f32_luma_vec(s as u32, s as u32, &circel, "circle.png");
     let eye_conv = eye_convolution_from_image();
@@ -225,7 +224,6 @@ fn detect_eyes_in_edges(image: &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[u32; 2]>
 
     let coords = eye_detected
         .enumerate_pixels()
-        .into_iter()
         .filter(|(_, _, c)| c.0[0] > 0.4)
         .map(|(x, y, _)| [x, y])
         .collect_vec();
@@ -273,7 +271,7 @@ mod test {
     #[test]
     fn convert_n1_1() {
         for u in 0..=255u8 {
-            let f = to_float_n1_1(u);
+            let f = to_float_0_1(u);
             dbg!(u);
             dbg!(f);
             if u < 128 {
@@ -283,11 +281,11 @@ mod test {
                 assert!(f >= 0.0);
                 assert!(f <= 1.0);
             }
-            assert!(dbg!(to_u8_n1_1(f)) == u);
+            assert!(dbg!(to_u8_0_1(f)) == u);
         }
     }
 
-    use super::{detect_eyes_in_edges, to_float_0_1, to_float_n1_1, to_u8_0_1, to_u8_n1_1};
+    use super::{detect_eyes_in_edges, to_float_0_1, to_u8_0_1};
     #[test]
     fn eye_detection_exists_with_glasses() {
         let png = ImageReader::open("edges_eyes_glasses.png")

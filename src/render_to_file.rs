@@ -27,6 +27,7 @@ pub async fn render_to_file(
         fragment_shader,
         fft,
         time_offset,
+        Arc::new(Mutex::new(Vec::new())),
         srgb,
         false,
     )

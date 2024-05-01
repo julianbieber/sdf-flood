@@ -10,7 +10,7 @@ use wgpu::{
 };
 
 use crate::{
-    model::{create_float_buffer, create_float_vec_buffer, Vertex},
+    model::{create_float_buffer, create_float_vec2_vec_buffer, create_float_vec_buffer, Vertex},
     render_pipeline,
 };
 
@@ -19,8 +19,10 @@ pub struct MainDisplay {
     pub time_start: Instant,
     pub time_offset: f32,
     pub fft: Arc<Mutex<Vec<f32>>>,
+    pub eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
     pub time_buffer: Buffer,
     pub fft_buffer: Buffer,
+    pub eye_buffer: Buffer,
     pub slider_buffer: Buffer,
     pub vertices: Buffer,
     pub bind_group: BindGroup,
@@ -28,6 +30,7 @@ pub struct MainDisplay {
 impl MainDisplay {
     pub fn new(
         fft: Arc<Mutex<Vec<f32>>>,
+        eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
         device: &Device,
         fragment_shader: &str,
         format: TextureFormat,
@@ -83,17 +86,28 @@ impl MainDisplay {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
         let time_buffer = create_float_buffer("time", device, 0.0);
         let fft_lock = fft.lock().unwrap();
         let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
+        let eye_buffer = create_float_vec2_vec_buffer("eye", device, &[[-1.0, -1.0]]);
         drop(fft_lock);
         let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
         let bind_group = create_bind_group(
             device,
             &bind_group_layout,
-            &[&time_buffer, &fft_buffer, &slider_buffer],
+            &[&time_buffer, &fft_buffer, &slider_buffer, &eye_buffer],
         );
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -137,6 +151,8 @@ impl MainDisplay {
             bind_group,
             slider_buffer,
             time_offset,
+            eye_positions,
+            eye_buffer,
         }
     }
 
@@ -154,12 +170,23 @@ impl MainDisplay {
             .write(&(self.time_start.elapsed().as_secs_f32() + self.time_offset))
             .unwrap();
         queue.write_buffer(&self.time_buffer, 0, &bytes);
+
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
         let fft_lock = self.fft.lock().unwrap();
         sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
         drop(fft_lock);
         queue.write_buffer(&self.fft_buffer, 0, &bytes);
+
+        let mut bytes = vec![];
+        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+        let fft_lock = self.eye_positions.lock().unwrap();
+        let eye_buffer_content: Vec<f32> = fft_lock.iter().cloned().flatten().collect();
+        drop(fft_lock);
+        sphere_bytes_writer
+            .write(eye_buffer_content.as_slice())
+            .unwrap();
+        queue.write_buffer(&self.eye_buffer, 0, &bytes);
 
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
