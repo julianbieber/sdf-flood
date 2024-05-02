@@ -259,6 +259,7 @@ impl<'a> State<'a> {
         size: WindowSize,
         fragment_shader_s: &str,
         fft: &Arc<Mutex<Vec<f32>>>,
+        time_offset: f32,
         srgb: bool,
         pi: bool,
     ) -> (Self, Option<TextureView>, Option<Texture>) {
@@ -270,6 +271,7 @@ impl<'a> State<'a> {
             fragment_shader_s,
             render_state.format,
             pi,
+            time_offset,
         );
         let ui = UIElements::new(&render_state.device, render_state.format);
 

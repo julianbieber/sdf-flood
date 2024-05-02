@@ -4,7 +4,12 @@ use wgpu::{Backends, InstanceFlags, TextureFormat};
 
 use crate::state::{State, WindowSize};
 
-pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<Vec<f32>>>) {
+pub async fn render_to_file(
+    srgb: bool,
+    fragment_shader: &str,
+    fft: &Arc<Mutex<Vec<f32>>>,
+    time_offset: f32,
+) {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: Backends::VULKAN,
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
@@ -21,6 +26,7 @@ pub async fn render_to_file(srgb: bool, fragment_shader: &str, fft: &Arc<Mutex<V
         },
         fragment_shader,
         fft,
+        time_offset,
         srgb,
         false,
     )

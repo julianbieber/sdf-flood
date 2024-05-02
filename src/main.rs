@@ -28,6 +28,8 @@ struct Opt {
     image_path: Option<PathBuf>,
     #[arg(long)]
     pi: bool,
+    #[arg(long, default_value_t = 0.0)]
+    time: f32,
 }
 
 fn main() {
@@ -39,7 +41,7 @@ fn main() {
 
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
     match opt.image_path {
-        Some(_) => pollster::block_on(render_to_file(opt.srgb, &fragment_shader, &o)),
-        None => render_to_screen(opt.fps, opt.pi, opt.srgb, &fragment_shader, &o),
+        Some(_) => pollster::block_on(render_to_file(opt.srgb, &fragment_shader, &o, opt.time)),
+        None => render_to_screen(opt.fps, opt.pi, opt.srgb, &fragment_shader, &o, opt.time),
     }
 }

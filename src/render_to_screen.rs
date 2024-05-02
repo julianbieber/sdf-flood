@@ -23,6 +23,7 @@ pub fn render_to_screen(
     srgb: bool,
     fragment_shader: &str,
     fft: &Arc<Mutex<Vec<f32>>>,
+    time_offset: f32,
 ) {
     let event_loop = EventLoop::new().unwrap();
     let mut video_modes: Vec<_> = event_loop
@@ -64,6 +65,7 @@ pub fn render_to_screen(
         },
         fragment_shader,
         fft,
+        time_offset,
         srgb,
         pi,
     ));

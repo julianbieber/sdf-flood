@@ -17,6 +17,7 @@ use crate::{
 pub struct MainDisplay {
     pub pipeline: RenderPipeline,
     pub time_start: Instant,
+    pub time_offset: f32,
     pub fft: Arc<Mutex<Vec<f32>>>,
     pub time_buffer: Buffer,
     pub fft_buffer: Buffer,
@@ -31,6 +32,7 @@ impl MainDisplay {
         fragment_shader: &str,
         format: TextureFormat,
         pi: bool,
+        time_offset: f32,
     ) -> MainDisplay {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
@@ -134,6 +136,7 @@ impl MainDisplay {
             vertices: vertex_buffer,
             bind_group,
             slider_buffer,
+            time_offset,
         }
     }
 
@@ -148,7 +151,7 @@ impl MainDisplay {
         let mut bytes = vec![];
         let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
         sphere_bytes_writer
-            .write(&self.time_start.elapsed().as_secs_f32())
+            .write(&(self.time_start.elapsed().as_secs_f32() + self.time_offset))
             .unwrap();
         queue.write_buffer(&self.time_buffer, 0, &bytes);
         let mut bytes = vec![];
