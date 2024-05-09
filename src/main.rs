@@ -4,6 +4,7 @@ mod render_pipeline;
 mod render_to_file;
 mod render_to_screen;
 mod renderable;
+mod sound;
 mod state;
 mod util;
 
@@ -28,6 +29,8 @@ struct Opt {
     image_path: Option<PathBuf>,
     #[arg(long)]
     pi: bool,
+    #[arg(long)]
+    play_audio: bool,
 }
 
 fn main() {
@@ -36,6 +39,12 @@ fn main() {
     let _audio_stream = audio::start(o.clone());
 
     let opt = dbg!(Opt::parse());
+
+    let s = if opt.play_audio {
+        Some(sound::play_audio())
+    } else {
+        None
+    };
 
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();
     match opt.image_path {

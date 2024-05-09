@@ -4,11 +4,13 @@ mod render_pipeline;
 mod render_to_file;
 mod render_to_screen;
 mod renderable;
+mod sound;
 mod state;
 mod util;
 
 use render_to_screen::render_to_screen;
 use std::sync::{Arc, Mutex};
+use std::{cell::Cell, rc::Rc};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -19,6 +21,19 @@ pub fn run() {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
             console_log::init_with_level(log::Level::Warn).expect("Couldn't initialize logger");
+
+            let document = gloo::utils::document();
+            if let Some(play_button) = document.get_element_by_id("play") {
+
+                let stream = Rc::new(Cell::new(None));
+
+                let closure = Closure::<dyn FnMut(_)>::new(move |_event: web_sys::MouseEvent| {
+                    stream.set(Some(sound::play_audio()));
+                });
+                play_button
+                    .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref()).unwrap();
+                closure.forget();
+            }
         } else {
             env_logger::init();
         }

@@ -27,45 +27,44 @@ pub fn render_to_screen(
     let event_loop = EventLoop::new().unwrap();
 
     cfg_if::cfg_if! {
-                if #[cfg(target_arch = "wasm32")] {
-                    use winit::dpi::PhysicalSize;
-        use winit::dpi::LogicalSize;
-                    let mut window = WindowBuilder::new()
-                     // .with_inner_size(PhysicalSize::new(450, 400))
-                     // .with_min_inner_size(LogicalSize::new(1.0, 1.0))
-                      .build(&event_loop)
-                     .unwrap();
+        if #[cfg(target_arch = "wasm32")] {
+            use winit::dpi::PhysicalSize;
+            use winit::dpi::LogicalSize;
+            let mut window = WindowBuilder::new()
+             // .with_inner_size(PhysicalSize::new(450, 400))
+             // .with_min_inner_size(LogicalSize::new(1.0, 1.0))
+              .build(&event_loop)
+             .unwrap();
 
-                    use winit::platform::web::WindowExtWebSys;
-    let canvas = window.canvas().expect("Couldn't get canvas");
-                canvas.style().set_css_text("height: 100%; width: 100%;");
-                // On wasm, append the canvas to the document body
-                web_sys::window()
-                    .and_then(|win| win.document())
-                    .and_then(|doc| doc.body())
-                    .and_then(|body| body.append_child(&canvas).ok())
-                    .expect("couldn't append canvas to document body");                 dbg!(window.inner_size());
-                let window = Arc::new(window);
-                } else {
-                    let window = {
-                        let mut video_modes: Vec<_> = event_loop
-                            .available_monitors()
-                            .next()
-                            .unwrap()
-                            .video_modes()
-                            .collect();
-                        video_modes.sort_by_key(|a| a.size().height * a.size().width);
-                        let window_mode = video_modes.into_iter().last().unwrap().clone();
-                        dbg!(&window_mode);
-                        Arc::new(
-                            WindowBuilder::new()
-                                .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
-                                .build(&event_loop)
-                                .unwrap(),
-                        )
-                    };
-                }
-            }
+            use winit::platform::web::WindowExtWebSys;
+            let canvas = window.canvas().expect("Couldn't get canvas");
+            canvas.style().set_css_text("height: 100%; width: 100%;");
+            // On wasm, append the canvas to the document body
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| doc.get_element_by_id("render"))
+                .and_then(|body| body.append_child(&canvas).ok())
+                .expect("couldn't append canvas to document body");
+            let window = Arc::new(window);
+        } else {
+            let window = {
+                let mut video_modes: Vec<_> = event_loop
+                    .available_monitors()
+                    .next()
+                    .unwrap()
+                    .video_modes()
+                    .collect();
+                video_modes.sort_by_key(|a| a.size().height * a.size().width);
+                let window_mode = video_modes.into_iter().last().unwrap().clone();
+                Arc::new(
+                    WindowBuilder::new()
+                        .with_fullscreen(Some(Fullscreen::Exclusive(window_mode.clone())))
+                        .build(&event_loop)
+                        .unwrap(),
+                )
+            };
+        }
+    }
 
     let mut fps = Fps::new();
     let mut input_state = InputState {
