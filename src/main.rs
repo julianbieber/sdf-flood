@@ -5,6 +5,7 @@ mod render_pipeline;
 mod render_to_file;
 mod render_to_screen;
 mod renderable;
+mod sound;
 mod state;
 mod util;
 
@@ -34,6 +35,8 @@ struct Opt {
     time: f32,
     #[arg(long)]
     cam: bool,
+    #[arg(long)]
+    play_audio: bool,
 }
 
 fn main() {
@@ -48,6 +51,11 @@ fn main() {
         eye::capture_eyes(eye_positions.clone())
     } else {
         thread::spawn(|| {})
+    };
+    let _s = if opt.play_audio {
+        Some(sound::play_audio())
+    } else {
+        None
     };
 
     let fragment_shader = std::fs::read_to_string(opt.shader_path).unwrap();

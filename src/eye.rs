@@ -3,8 +3,8 @@ use std::sync::Mutex;
 use std::thread;
 
 use image::imageops::grayscale;
-use image::io::Reader as ImageReader;
 use image::ImageBuffer;
+use image::ImageReader;
 use image::Luma;
 use image::Pixel;
 use image::Rgb;
@@ -257,7 +257,7 @@ fn create_circle_convolution(
 
 #[cfg(test)]
 mod test {
-    use image::{imageops::grayscale, io::Reader as ImageReader};
+    use image::{imageops::grayscale, ImageReader};
 
     #[test]
     fn convert_0_1() {

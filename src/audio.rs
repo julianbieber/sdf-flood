@@ -5,6 +5,7 @@ use cpal::{Stream, StreamConfig};
 use spectrum_analyzer::scaling::scale_to_zero_to_one;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 
+#[allow(dead_code)]
 pub fn start(output: Arc<Mutex<Vec<f32>>>) -> Stream {
     let length = output.lock().unwrap().len();
     let host = cpal::default_host();

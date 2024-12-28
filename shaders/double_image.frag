@@ -4,6 +4,9 @@ layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec2 uv;
 layout(binding = 0) uniform UniformParameters {
     float time;
+    float o1;
+    float o2;
+    float o3;
 } u;
 layout(binding = 1) readonly buffer fftBuffer {
     float v[];

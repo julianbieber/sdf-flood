@@ -1,6 +1,6 @@
 # Required shader inputs
 
-```
+```glsl
 layout (location = 0) out vec4 out_color;
   
 layout (location = 0) in vec2 uv;   
@@ -22,3 +22,10 @@ layout (binding  = 2) readonly buffer SliderParameters{
 * press 1-0 to select slider
 * up/down for increment/decrement slider values (between 0.0 and 1.0 in increments of 0.01)
 * mouse click sets slider to value
+
+# wasm
+
+compile with
+```bash
+wasm-pack build
+```

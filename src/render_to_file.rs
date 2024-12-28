@@ -4,6 +4,7 @@ use wgpu::{Backends, InstanceFlags, TextureFormat};
 
 use crate::state::{State, WindowSize};
 
+#[allow(dead_code)]
 pub async fn render_to_file(
     srgb: bool,
     fragment_shader: &str,
