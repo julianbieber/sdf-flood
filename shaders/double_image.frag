@@ -3,20 +3,9 @@ layout(location = 0) out vec4 out_color;
 
 layout(location = 0) in vec2 uv;
 layout(binding = 0) uniform UniformParameters {
+    vec2 padding;
     float time;
-    float o1;
-    float o2;
-    float o3;
 } u;
-layout(binding = 1) readonly buffer fftBuffer {
-    float v[];
-} fft;
-layout(binding = 3) readonly buffer eyeBuffer {
-    float v[];
-} eyes;
-layout(binding = 2) readonly buffer SliderParameters {
-    float v[];
-} sliders;
 
 #define PI 3.1415926538
 #define TAU 6.2831853071

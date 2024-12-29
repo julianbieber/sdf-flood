@@ -12,10 +12,11 @@ mod util;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
-    thread,
+    thread::{self, JoinHandle},
 };
 
 use clap::Parser;
+use cpal::Stream;
 use render_to_file::render_to_file;
 use render_to_screen::render_to_screen;
 
@@ -37,14 +38,32 @@ struct Opt {
     cam: bool,
     #[arg(long)]
     play_audio: bool,
+    #[arg(long)]
+    fft_voyage_voyage: bool,
+}
+
+#[allow(dead_code)]
+enum AudioStream {
+    STREAM(Stream),
+    THREAD(JoinHandle<()>),
 }
 
 fn main() {
     env_logger::init();
-    let o = Arc::new(Mutex::new(vec![0.0; 2048]));
-    let _audio_stream = audio::start(o.clone());
 
     let opt = dbg!(Opt::parse());
+    let (_audio_stream, o) = if opt.fft_voyage_voyage {
+        let o = Arc::new(Mutex::new(vec![0.0f32; 1024]));
+        let o_c = o.clone();
+        let s = thread::spawn(move || {
+            let wav = std::fs::read("src/voyage.wav").unwrap();
+            audio::start_voyage(o_c, wav);
+        });
+        (AudioStream::THREAD(s), o)
+    } else {
+        let (s, o) = audio::start();
+        (AudioStream::STREAM(s), o)
+    };
 
     let eye_positions = Arc::new(Mutex::new(Vec::new()));
     let eye_join_handle = if opt.cam {

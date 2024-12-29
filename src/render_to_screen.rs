@@ -9,7 +9,7 @@ use winit::{
     event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     monitor::VideoMode,
-    window::{Fullscreen, WindowBuilder},
+    window::{Fullscreen, Window, WindowBuilder},
 };
 
 use crate::{
@@ -74,9 +74,10 @@ pub fn render_to_screen(
         pressed: HashMap::new(),
         is_clicked: false,
     };
+    log::warn!("before instance");
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         #[cfg(target_family = "wasm")]
-        backends: Backends::BROWSER_WEBGPU,
+        backends: Backends::GL,
         #[cfg(all(unix, not(target_family = "wasm")))]
         backends: if pi { Backends::GL } else { Backends::VULKAN },
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
@@ -84,15 +85,13 @@ pub fn render_to_screen(
         gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
     });
     let w2 = window.clone();
+    let (width, height) = screen_size(window.clone());
     let surface = Some(instance.create_surface(&w2).unwrap());
     let (mut render_state, _f, _t) = pollster::block_on(State::new(
         instance,
         surface,
         None,
-        WindowSize {
-            width: 1920,
-            height: 1080,
-        },
+        WindowSize { width, height },
         fragment_shader,
         fft,
         time_offset,
@@ -197,4 +196,15 @@ impl InputState {
     fn released(&mut self, key: Key) {
         *self.pressed.entry(key).or_insert(false) = false;
     }
+}
+
+#[cfg(all(unix, not(target_family = "wasm")))]
+fn screen_size(window: Arc<Window>) -> (u32, u32) {
+    let s = window.inner_size();
+    (s.width, s.height)
+}
+
+#[cfg(target_family = "wasm")]
+fn screen_size(window: Arc<Window>) -> (u32, u32) {
+    (1920, 1080)
 }

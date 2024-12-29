@@ -28,6 +28,7 @@ async-trait = "0.1.74"
 itertools = "0.12.1"
 cfg-if = "1.0.0"
 hound = "3.5.1"
+rustfft = "6.2.0"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 wgpu = { version = "0.19.1", features = ["glsl", "webgl"], default-features=false }
@@ -35,7 +36,8 @@ console_error_panic_hook = "0.1.6"
 console_log = "1.0"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.30"
-web-sys = { version = "=0.3.67", features = [
+wasm_thread = "0.3.3"
+web-sys = { version = "=0.3.77", features = [
     "Document",
     "Window",
     "Element",

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use wgpu::{Backends, InstanceFlags, TextureFormat};
 
@@ -11,6 +14,7 @@ pub async fn render_to_file(
     fft: &Arc<Mutex<Vec<f32>>>,
     time_offset: f32,
 ) {
+    std::thread::sleep(Duration::from_secs(13));
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: Backends::VULKAN,
         dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,

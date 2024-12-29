@@ -272,8 +272,6 @@ mod test {
     fn convert_n1_1() {
         for u in 0..=255u8 {
             let f = to_float_0_1(u);
-            dbg!(u);
-            dbg!(f);
             if u < 128 {
                 assert!(f >= -1.0);
                 assert!(f <= 0.0);
