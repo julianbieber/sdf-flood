@@ -1,3 +1,4 @@
+use log::warn;
 #[cfg(all(unix, not(target_family = "wasm")))]
 use std::time::Instant;
 use std::{
@@ -14,7 +15,7 @@ use wgpu::{
 };
 
 use crate::{
-    model::{create_float_buffer, create_float_vec2_vec_buffer, create_float_vec_buffer, Vertex},
+    model::{create_float_vec2_vec_buffer, create_float_vec_buffer, create_uniform_buffer, Vertex},
     render_pipeline,
 };
 
@@ -24,13 +25,61 @@ pub struct MainDisplay {
     pub time_offset: f32,
     pub fft: Arc<Mutex<Vec<f32>>>,
     pub eye_positions: Arc<Mutex<Vec<[f32; 2]>>>,
-    pub time_buffer: Buffer,
-    pub fft_buffer: Buffer,
-    pub eye_buffer: Buffer,
-    pub slider_buffer: Buffer,
     pub vertices: Buffer,
+    pub buffers: Vec<Buffer>,
     pub bind_group: BindGroup,
+    pub _layout: Vec<wgpu::BindGroupLayoutEntry>,
 }
+
+#[cfg(all(unix, not(target_family = "wasm")))]
+fn buffer_layouts() -> Vec<wgpu::BindGroupLayoutEntry> {
+    vec![
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform {},
+                has_dynamic_offset: false,
+                min_binding_size: NonZeroU64::new(16),
+            },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 2,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+    ]
+}
+#[cfg(target_family = "wasm")]
+fn buffer_layouts() -> Vec<wgpu::BindGroupLayoutEntry> {
+    vec![wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform {},
+            has_dynamic_offset: false,
+            min_binding_size: NonZeroU64::new(16),
+        },
+        count: None,
+    }]
+}
+
 impl MainDisplay {
     pub fn new(
         fft: Arc<Mutex<Vec<f32>>>,
@@ -57,61 +106,23 @@ impl MainDisplay {
                 defines: wgpu::naga::FastHashMap::default(),
             },
         });
+        let layout_entries = buffer_layouts();
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform {},
-                        has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(16),
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
+            entries: &layout_entries,
         });
-        let time_buffer = create_float_buffer("time", device, 0.0);
+
         let fft_lock = fft.lock().unwrap();
-        let fft_buffer = create_float_vec_buffer("fft", device, fft_lock.as_slice());
-        let eye_buffer = create_float_vec2_vec_buffer("eye", device, &[[-1.0, -1.0]]);
+        let fft_value = fft_lock[0];
         drop(fft_lock);
-        let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
+        let buffers = create_buffers(device, fft_value);
         let bind_group = create_bind_group(
             device,
             &bind_group_layout,
-            &[&time_buffer, &fft_buffer, &slider_buffer, &eye_buffer],
+            &(buffers
+                .iter()
+                .take(layout_entries.len())
+                .collect::<Vec<_>>()),
         );
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -145,18 +156,17 @@ impl MainDisplay {
             })],
             &[Vertex::desc()],
         ));
+        warn!("pipeline created");
         Self {
             pipeline,
             time_start: Instant::now(),
             fft,
-            time_buffer,
-            fft_buffer,
             vertices: vertex_buffer,
             bind_group,
-            slider_buffer,
             time_offset,
             eye_positions,
-            eye_buffer,
+            buffers,
+            _layout: layout_entries,
         }
     }
 
@@ -167,44 +177,52 @@ impl MainDisplay {
         render_pass.draw(0..6, 0..1);
     }
 
-    pub fn update_buffers(&self, queue: &Queue, ui: &UIElements) {
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        sphere_bytes_writer
-            .write(&(self.time_start.elapsed().as_secs_f32() + self.time_offset))
-            .unwrap();
-        queue.write_buffer(&self.time_buffer, 0, &bytes);
-
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+    pub fn update_buffers(&self, queue: &Queue, ui: &Option<UIElements>) {
         let fft_lock = self.fft.lock().unwrap();
-        sphere_bytes_writer.write(fft_lock.as_slice()).unwrap();
+        let fft_value = fft_lock[0];
         drop(fft_lock);
-        queue.write_buffer(&self.fft_buffer, 0, &bytes);
+        if let Some(time_buffer) = self.buffers.get(0) {
+            write_to_buffer(
+                &[
+                    self.time_start.elapsed().as_secs_f32() + self.time_offset,
+                    fft_value,
+                    0.0,
+                    0.0,
+                ],
+                time_buffer,
+                queue,
+            );
+        }
 
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        let fft_lock = self.eye_positions.lock().unwrap();
-        let eye_buffer_content: Vec<f32> = fft_lock.iter().cloned().flatten().collect();
-        drop(fft_lock);
-        sphere_bytes_writer
-            .write(eye_buffer_content.as_slice())
-            .unwrap();
-        queue.write_buffer(&self.eye_buffer, 0, &bytes);
-
-        let mut bytes = vec![];
-        let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-        sphere_bytes_writer
-            .write(
-                ui.elements
-                    .iter()
-                    .map(|u| u.value)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .unwrap();
-        queue.write_buffer(&self.slider_buffer, 0, &bytes);
+        if let Some(ui_buffer) = self.buffers.get(1) {
+            if let Some(u) = ui {
+                let c = u.elements.iter().map(|u| u.value).collect::<Vec<_>>();
+                write_to_buffer(&c, ui_buffer, queue);
+            }
+        }
+        if let Some(eye_buffer) = self.buffers.get(2) {
+            let lock = self.eye_positions.lock().unwrap();
+            let eye_buffer_content: Vec<f32> = lock.iter().cloned().flatten().collect();
+            drop(lock);
+            write_to_buffer(&eye_buffer_content, eye_buffer, queue);
+        }
     }
+}
+
+#[cfg(all(unix, not(target_family = "wasm")))]
+fn create_buffers(device: &Device, fft_value: f32) -> Vec<Buffer> {
+    let uniform_buffer = create_uniform_buffer("uniform", device, [0.0, fft_value, 0.0, 0.0]);
+    let slider_buffer = create_float_vec_buffer("sliders", device, &[0.0; 10]);
+    let eye_buffer = create_float_vec2_vec_buffer("eye", device, &[[-1.0, -1.0]]);
+    let buffers = vec![uniform_buffer, slider_buffer, eye_buffer];
+    buffers
+}
+
+#[cfg(target_family = "wasm")]
+fn create_buffers(device: &Device, fft_value: f32) -> Vec<Buffer> {
+    let uniform_buffer = create_uniform_buffer("uniform", device, [0.0, fft_value, 0.0, 0.0]);
+    let buffers = vec![uniform_buffer];
+    buffers
 }
 
 pub struct UIElements {
@@ -244,7 +262,14 @@ impl UIElements {
             self.elements[self.selected].decrement();
         }
     }
-    pub fn new(device: &Device, format: TextureFormat) -> Self {
+
+    #[cfg(target_family = "wasm")]
+    pub fn new(device: &Device, format: TextureFormat) -> Option<Self> {
+        None
+    }
+
+    #[cfg(all(unix, not(target_family = "wasm")))]
+    pub fn new(device: &Device, format: TextureFormat) -> Option<Self> {
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("vertex_shader"),
             source: wgpu::ShaderSource::Glsl {
@@ -296,7 +321,7 @@ impl UIElements {
         let height = 0.05;
         let elements: Vec<_> = (0..10)
             .map(|i| {
-                let slider_buffer = create_float_buffer("slider", device, 0.0);
+                let slider_buffer = create_uniform_buffer("slider", device, [0.0, 0.0, 0.0, 0.0]);
                 let bind_group = create_bind_group(device, &bind_group_layout, &[&slider_buffer]);
                 let vertices = Vertex::rect(
                     Vector2 {
@@ -327,12 +352,12 @@ impl UIElements {
                 }
             })
             .collect();
-        Self {
+        Some(Self {
             pipeline,
             elements,
             hidden: true,
             selected: 0,
-        }
+        })
     }
 
     pub fn render<'a, 'b: 'a>(&'b self, render_pass: &mut RenderPass<'a>) {
@@ -406,4 +431,11 @@ fn create_bind_group(device: &Device, layout: &BindGroupLayout, buffers: &[&Buff
             .collect::<Vec<_>>(),
     });
     bind_group
+}
+
+fn write_to_buffer(src: &[f32], dst: &Buffer, queue: &Queue) {
+    let mut bytes = vec![];
+    let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
+    sphere_bytes_writer.write(src).unwrap();
+    queue.write_buffer(dst, 0, &bytes);
 }

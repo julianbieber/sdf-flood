@@ -21,7 +21,7 @@ use crate::renderable::{MainDisplay, UIElements};
 pub struct State<'a> {
     render_state: RenderState<'a>,
     main_display: MainDisplay,
-    ui: UIElements,
+    ui: Option<UIElements>,
 }
 
 enum SurfaceTypes<'a> {
@@ -76,6 +76,9 @@ impl<'a> RenderState<'a> {
                         &wgpu::DeviceDescriptor {
                             label: Some("device"),
                             required_features: wgpu::Features::empty(),
+                            #[cfg(target_family = "wasm")]
+                            required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                            #[cfg(all(unix, not(target_family = "wasm")))]
                             required_limits: wgpu::Limits::downlevel_defaults(),
                         },
                         None,
@@ -93,11 +96,7 @@ impl<'a> RenderState<'a> {
                     view_formats: vec![],
                     desired_maximum_frame_latency: 2,
                 };
-                let w = size.width;
-                let h = size.height;
-                log::warn!("after configure {w:?} {h:?}");
                 surface.configure(&device, &config);
-                log::warn!("after configure");
                 (
                     RenderState {
                         surface: SurfaceTypes::Window(surface),
@@ -131,14 +130,6 @@ impl<'a> RenderState<'a> {
                 };
 
                 let texture = device.create_texture(&tecture_desc);
-                //  Some((
-                //     &texture,
-                //     wgpu::Extent3d {
-                //         width: 1920,
-                //         height: 1080,
-                //         depth_or_array_layers: 1,
-                //     },
-                // ))
                 let texture_view = texture.create_view(&Default::default());
                 (
                     RenderState {
@@ -157,7 +148,7 @@ impl<'a> RenderState<'a> {
     fn render(
         &mut self,
         main_display: &MainDisplay,
-        ui: &UIElements,
+        ui: &Option<UIElements>,
         file_render_view: Option<TextureView>,
         file_render_texture: Option<Texture>,
     ) -> Result<(), wgpu::SurfaceError> {
@@ -195,11 +186,16 @@ impl<'a> RenderState<'a> {
             });
 
             main_display.render(&mut render_pass);
-            ui.render(&mut render_pass);
+            if let Some(u) = ui {
+                u.render(&mut render_pass);
+            }
         }
 
         main_display.update_buffers(&self.queue, ui);
-        ui.update_buffers(&self.queue);
+
+        if let Some(u) = ui {
+            u.update_buffers(&self.queue);
+        }
         let ob = match &self.surface {
             SurfaceTypes::Window(_) => None,
             SurfaceTypes::File() => {
@@ -253,8 +249,6 @@ impl<'a> RenderState<'a> {
                         self.device.poll(wgpu::MaintainBase::Wait);
                         pollster::block_on(async { rx.await.unwrap().unwrap() });
                         let data = buffer_slice.get_mapped_range();
-                        dbg!(data.len());
-                        dbg!(data[0]);
                         let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(1920, 1080, data).unwrap();
                         buffer.save("screen.png").unwrap();
                     }
@@ -329,27 +323,30 @@ impl<'a> State<'a> {
     }
 
     pub fn report_just_pressed(&mut self, key: Key) {
-        match key {
-            Key::Character(s) if s == "m" => self.ui.toggle_hidden(),
-            Key::Character(s) if s == "0" => self.ui.select(0),
-            Key::Character(s) if s == "1" => self.ui.select(1),
-            Key::Character(s) if s == "2" => self.ui.select(2),
-            Key::Character(s) if s == "3" => self.ui.select(3),
-            Key::Character(s) if s == "4" => self.ui.select(4),
-            Key::Character(s) if s == "5" => self.ui.select(5),
-            Key::Character(s) if s == "6" => self.ui.select(6),
-            Key::Character(s) if s == "7" => self.ui.select(7),
-            Key::Character(s) if s == "8" => self.ui.select(8),
-            Key::Character(s) if s == "9" => self.ui.select(9),
-            Key::Named(NamedKey::ArrowUp) => self.ui.increment(),
-            Key::Named(NamedKey::ArrowDown) => self.ui.decrement(),
-            _ => (),
+        if let Some(u) = &mut self.ui {
+            match key {
+                Key::Character(s) if s == "m" => u.toggle_hidden(),
+                Key::Character(s) if s == "0" => u.select(0),
+                Key::Character(s) if s == "1" => u.select(1),
+                Key::Character(s) if s == "2" => u.select(2),
+                Key::Character(s) if s == "3" => u.select(3),
+                Key::Character(s) if s == "4" => u.select(4),
+                Key::Character(s) if s == "5" => u.select(5),
+                Key::Character(s) if s == "6" => u.select(6),
+                Key::Character(s) if s == "7" => u.select(7),
+                Key::Character(s) if s == "8" => u.select(8),
+                Key::Character(s) if s == "9" => u.select(9),
+                Key::Named(NamedKey::ArrowUp) => u.increment(),
+                Key::Named(NamedKey::ArrowDown) => u.decrement(),
+                _ => (),
+            }
         }
     }
 
     #[allow(dead_code)]
     pub fn report_click(&mut self, position: (f32, f32)) {
-        self.ui
-            .click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))
+        if let Some(u) = &mut self.ui {
+            u.click((position.0 * 2.0 - 1.0, position.1 * 2.0 - 1.0))
+        }
     }
 }

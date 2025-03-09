@@ -12,7 +12,6 @@ impl Vertex {
         wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x2];
 
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        dbg!(std::mem::size_of::<Self>());
         wgpu::VertexBufferLayout {
             array_stride: 32 as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -74,19 +73,17 @@ impl Vertex {
     }
 }
 
-pub fn create_float_buffer(name: &str, device: &Device, time: f32) -> Buffer {
+pub fn create_uniform_buffer(name: &str, device: &Device, values: [f32; 4]) -> Buffer {
     let mut bytes = vec![];
     let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
-    sphere_bytes_writer.write(&time).unwrap();
-    sphere_bytes_writer.write(&0.0).unwrap();
-    sphere_bytes_writer.write(&0.0).unwrap();
-    sphere_bytes_writer.write(&0.0).unwrap();
+    sphere_bytes_writer.write_iter(values.into_iter()).unwrap();
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some(name),
         contents: &bytes[..],
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
 }
+
 pub fn create_float_vec_buffer(name: &str, device: &Device, fft: &[f32]) -> Buffer {
     let mut bytes = vec![];
     let mut sphere_bytes_writer = crevice::std430::Writer::new(&mut bytes);
@@ -97,6 +94,7 @@ pub fn create_float_vec_buffer(name: &str, device: &Device, fft: &[f32]) -> Buff
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
     }) // https://github.com/gfx-rs/wgpu/blob/73f42352f3d80f6a5efd0615b750474ad6ff0338/wgpu/examples/boids/main.rs#L216
 }
+
 pub fn create_float_vec2_vec_buffer(name: &str, device: &Device, content: &[[f32; 2]]) -> Buffer {
     let mint_content = content.iter().map(|s| mint::Point2::from_slice(s));
     let mut bytes = vec![];
