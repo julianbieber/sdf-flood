@@ -18,6 +18,7 @@ layout(binding = 2) readonly buffer SliderParameters {
 #define PI 3.1415926538
 #define TAU 6.2831853071
 #define FOV 60.0
+#define GOLDEN_RATIO 1.6180339887498948482
 
 const mat3 OKLAB2RGB_A = mat3(
         1.0, 1.0, 1.0,
@@ -29,6 +30,9 @@ const mat3 OKLAB2RGB_B = mat3(
         -3.3077115913, 2.6097574011, -0.7034186147,
         0.2309699292, -0.3413193965, 1.7076147010);
 
+float power = 2.0;
+int iterations = 10;
+
 vec3 oklab2rgb(vec3 oklab) {
     vec3 lms = OKLAB2RGB_A * oklab;
     return OKLAB2RGB_B * (lms * lms * lms);
@@ -39,7 +43,7 @@ vec4 oklab2rgb(vec4 oklab) {
 }
 
 vec4 permute(vec4 x) {
-    return mod(((x*34.0)+1.0)*x, 289.0);
+    return mod(((x * 34.0) + 1.0) * x, 289.0);
 }
 
 vec4 taylorInvSqrt(vec4 r) {
@@ -47,15 +51,15 @@ vec4 taylorInvSqrt(vec4 r) {
 }
 
 vec3 fade(vec3 t) {
-    return t*t*t*(t*(t*6.0-15.0)+10.0);
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
 
 float cnoise(vec3 P) {
-    vec3 Pi0 = floor(P);        // Integer part for indexing
+    vec3 Pi0 = floor(P); // Integer part for indexing
     vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1
     Pi0 = mod(Pi0, 289.0);
     Pi1 = mod(Pi1, 289.0);
-    vec3 Pf0 = fract(P);        // Fractional part for interpolation
+    vec3 Pf0 = fract(P); // Fractional part for interpolation
     vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0
 
     vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
@@ -92,15 +96,15 @@ float cnoise(vec3 P) {
     vec3 g011 = vec3(gx1.z, gy1.z, gz1.z);
     vec3 g111 = vec3(gx1.w, gy1.w, gz1.w);
 
-    vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), 
-                                  dot(g100, g100), dot(g110, g110)));
+    vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010),
+                dot(g100, g100), dot(g110, g110)));
     g000 *= norm0.x;
     g010 *= norm0.y;
     g100 *= norm0.z;
     g110 *= norm0.w;
 
-    vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), 
-                                  dot(g101, g101), dot(g111, g111)));
+    vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011),
+                dot(g101, g101), dot(g111, g111)));
     g001 *= norm1.x;
     g011 *= norm1.y;
     g101 *= norm1.z;
@@ -117,7 +121,7 @@ float cnoise(vec3 P) {
 
     vec3 fade_xyz = fade(Pf0);
     vec4 n_z = mix(vec4(n000, n100, n010, n110),
-                   vec4(n001, n101, n011, n111), fade_xyz.z);
+            vec4(n001, n101, n011, n111), fade_xyz.z);
     vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
     float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);
     return 2.2 * n_xyz;
@@ -127,15 +131,14 @@ float fbm(vec3 position, int octaves, float lacunarity, float gain) {
     float value = 0.0;
     float amplitude = 0.5;
     float frequency = 3.0;
-    
-    for(int i = 0; i < octaves; i++) {
+
+    for (int i = 0; i < octaves; i++) {
         value += amplitude * cnoise(position * frequency);
         frequency *= lacunarity;
         amplitude *= gain;
     }
     return value;
 }
-
 
 vec3 rotate(vec3 p, float yaw, float pitch, float roll) {
     return (mat3(cos(yaw), -sin(yaw), 0.0, sin(yaw), cos(yaw), 0.0, 0.0, 0.0, 1.0) *
@@ -145,6 +148,80 @@ vec3 rotate(vec3 p, float yaw, float pitch, float roll) {
 }
 float sphere(vec3 p, vec3 center, float radius) {
     return length(p - center) - radius;
+}
+
+
+float sierpinskiicosahedron_sdf(vec3 z) {
+    float scale = power;
+	vec3 n1 = normalize(vec3(-GOLDEN_RATIO, GOLDEN_RATIO - 1.0, 1.0));
+	vec3 n2 = normalize(vec3(1.0, -GOLDEN_RATIO, GOLDEN_RATIO + 1.0));
+	vec3 n3 = normalize(vec3(0.0, 0.0, -1.0));
+	vec3 offset = vec3(0.85065, 0.52573, 0.0);
+	float orbit_trap = 100000.0;
+	float r;
+	float t;
+	int n = 0;
+
+	z = abs(z);
+	t = dot(z, n1); if (t > 0.0) z -= 2.0 * t * n1;
+	t = dot(z, n2); if (t > 0.0) z -= 2.0 * t * n2;
+	t = dot(z, n3); if (t > 0.0) z -= 2.0 * t * n3;
+	t = dot(z, n2); if (t > 0.0) z -= 2.0 * t * n2;
+
+	for (; n < iterations; n++) {
+		z = abs(z);
+		t = dot(z, n1); if (t > 0.0) z -= 2.0 * t * n1;
+		z = scale * z - offset * (scale - 1.0);
+
+		r = dot(z, z);
+		orbit_trap = min(orbit_trap, abs(r));
+		if (r > 64.0) break;
+	}
+
+	// return vec2(length(z) * pow(scale, float(-n - 1)), orbit_trap).yx;
+	return length(z) * pow(scale, float(-n - 1));
+
+}
+
+
+float sdHexPrism( vec3 p, vec2 h )
+{
+    vec3 q = abs(p);
+    return max(q.z-h.y,max((q.x*0.866025+q.y*0.5),q.y)-h.x);
+}
+float smoothUnion(float d1, float d2, float k) {
+    // Polynomial smooth minimum (IQ's original implementation)
+    float h = clamp(0.5 + 0.5*(d2 - d1)/k, 0.0, 1.0);
+    return mix(d2, d1, h) - k*h*(1.0 - h);
+}
+float sdEmerald(vec3 p) {
+    // Base hexagonal prism (pavilion)
+    p = rotate(p, 0.0, u.time, 0.0);
+    float pavilion = sdHexPrism(p, vec2(0.4, 0.4));
+    
+    // Crown taper using scaled hex prism
+    vec3 crownPos = p;
+    crownPos.y -= 0.6; // Shift coordinate system
+    crownPos.xz *= 1.0 - max(0.0, crownPos.y * 1.2); // Taper effect
+    float crown = sdHexPrism(crownPos, vec2(0.3, 0.4));
+    
+    // Faceting with angled planes
+    float facets = 1e5;
+    for(int i = 0; i < 6; i++) {
+        vec3 planePos = p;
+        planePos = rotate(planePos, 0.0, 0.0, radians(60.0 * float(i)) );
+        facets = min(facets, planePos.x - 0.12); // Radial facets
+    }
+    
+    // Combine elements
+    float gem = smoothUnion(pavilion, crown, 0.1);
+    return max(gem, -facets); // Carve facets via intersection
+}
+float sdDiamond(vec3 p, float height, float width) {
+    // Vertical stretching and cross-section shaping
+    p.y *= 0.7; // Adjust vertical compression
+    vec3 q = abs(p);
+    return (q.x + q.y + q.z - width) * 0.577; // Basic octahedron SDF
 }
 
 // Base octahedron SDF from Inigo Quilez
@@ -182,8 +259,47 @@ float sdCarvedEmerald(vec3 p, float size) {
     return d * size;
 }
 
+
+// Add rotational symmetry (8-fold for realistic diamond facets)
+vec2 rotate2(vec2 p, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return mat2(c, -s, s, c) * p;
+}
+
+float sdFacetedDiamond(vec3 p, int facets) {
+    // Base diamond proportions
+    p.y *= 0.65; // Vertical compression
+    vec3 q = abs(p);
+    float base = (q.x + q.y + q.z - 0.8) * 0.577;
+    
+    // Crown facets (top section)
+    if(p.y > 0.1) {
+        p.xz = rotate2(p.xz, 3.14159/float(facets));
+        float crown = length(p.xz * vec2(1.2, 0.8)) - 0.3;
+        base = min(base, crown);
+    }
+    
+    // Pavilion facets (bottom section)
+    if(p.y < -0.2) {
+        p.xz = rotate2(p.xz, -3.14159/float(facets/2));
+        float pavilion = max(abs(p.x) - 0.25, abs(p.z) - 0.25);
+        base = min(base, pavilion);
+    }
+    
+    // Girdle facets using rotati2onal repetition
+    for(int i = 0; i < facets; i++) {
+        float angle = 6.283 * float(i)/float(facets);
+        vec2 rp = rotate2(p.xz, angle);
+        float girdleFacet = max(abs(rp.x) - 0.35, abs(p.y) - 0.15);
+        base = min(base, girdleFacet);
+    }
+    
+    return base;
+}
+
 float scene(vec3 p) {
-    return sdCarvedEmerald(p, 1.0);
+    return sierpinskiicosahedron_sdf(rotate(p, 0.0, u.time, 0.0));
 }
 
 vec3 normal(in vec3 p) // for function f(p)
@@ -198,57 +314,148 @@ float fov_factor() {
     return tan(FOV / 2.0 * PI / 180.0);
 }
 
-vec4 follow_ray_in_emerald(vec3 start, vec3 direction) {
-    float traveled = 0.0;
+// vec4 follow_ray_in_emerald(vec3 start, vec3 direction) {
+//     float traveled = 0.0;
 
-    float intensity = 0.0;
+//     float intensity = 0.0;
 
-    for (int i = 0; i < 20; ++i) {
-        vec3 p = start + direction * traveled;
-        traveled += 0.04;
-        p.xz *= mat2(0.9, -0.8, 0.8, 0.9);
-        float n = fbm(vec3(p.xy, u.time / 10.0), 5, 3.2, 0.5);
-        intensity += n/ 2.0;
-        // intensity = exp(-intensity * 0.05);
-    }
+//     for (int i = 0; i < 20; ++i) {
+//         vec3 p = start + direction * traveled;
+//         traveled += 0.04;
+//         p.xz *= mat2(0.9, -0.8, 0.8, 0.9);
+//         float n = fbm(vec3(p.xy, u.time / 10.0), 5, 3.2, 0.5);
+//         intensity += n/ 2.0;
+//         // intensity = exp(-intensity * 0.05);
+//     }
 
-    intensity = mix(0.1, 0.3, intensity);
-    
-    vec3 blue = oklab2rgb(vec3(intensity, -0.03, -0.09));
-    return vec4(blue, intensity);
+//     intensity = mix(0.1, 0.3, intensity);
+
+// }
+
+float intensity_clamp(float i, float steepness) {
+    return smoothstep(0.0, steepness, i) / steepness;
 }
 
-vec4 follow_ray(vec3 start, vec3 direction, int steps, float max_dist) {
-    vec3 green = oklab2rgb(vec3(0.89, -0.18, 0.05));
+vec3 background_color(vec3 p) {
+    vec3 c0 = vec3(0.13, -0.01, -0.07);
+    vec3 c1 = vec3(0.16, 0.03, -0.06);
+    vec3 c2 = vec3(0.19, 0.05, -0.06);
+    vec3 c3 = vec3(0.24, 0.08, -0.05);
+    vec3 c4 = vec3(0.30, 0.11, -0.03);
+    float t = fbm(p + vec3(u.time / 12.0) * 0.2, 2, 5.0, 1.5);
+    t = clamp(t, 0.0, 1.0);
+    float scaledT = t * 4.0; // Split into 4 intervals
+    int index = clamp(int(floor(scaledT)), 0, 3); // Segment index (0-3)
+    float fraction = scaledT - float(index); // Local blend factor
+
+    if (index == 3) return mix(c3, c4, fraction);
+    else if (index == 2) return mix(c2, c3, fraction);
+    else if (index == 1) return mix(c1, c2, fraction);
+    return mix(c0, c1, fraction);
+}
+
+vec3 weightedOklabAverage(vec4 color1, vec4 color2, vec4 color3, vec4 color4) {
+    // Input colors: vec4(weight, L, a, b) in Oklab space
+    vec4 colors[4] = vec4[4](color1, color2, color3, color4);
+
+    // Oklab to LMS conversion matrix (cube root space)
+    mat3 lab_to_lms = mat3(
+            1.0, 1.0, 1.0,
+            0.39633777, -0.10556134, -0.08948418,
+            0.21580376, -0.06385417, -1.29148555
+        );
+
+    // LMS to Oklab conversion matrix
+    mat3 lms_to_lab = mat3(
+            0.21045426, 1.97799849, 0.02590404,
+            0.79361779, -2.42859221, 0.78277177,
+            -0.00407205, 0.45059371, -0.80867577
+        );
+
+    vec3 sum_lms = vec3(0.0);
+    float total_weight = 0.0;
+
+    for (int i = 0; i < 4; i++) {
+        float weight = colors[i].x;
+        vec3 lab = colors[i].xyz;
+        vec3 lms = lab_to_lms * lab;
+        sum_lms += lms * weight;
+        total_weight += weight;
+    }
+
+    vec3 avg_lms = sum_lms / total_weight;
+    return lms_to_lab * avg_lms;
+}
+
+vec4 follow_ray(vec3 start, vec3 original_direction, int steps) {
+    vec3 emerald_color = vec3(0.0, -0.18, 0.05) + vec3(0.0, cnoise(original_direction) * 0.3, 0.0);
+    vec3 stormlight_color = vec3(0.0, -0.03, -0.09)+ vec3(0.0, cnoise(original_direction) * 0.2, 0.0);
+    vec3 voidlight_color = vec3(0.0, 0.08, 0.05);
+
     float traveled = 0.0;
+    vec3 direction = original_direction;
     vec3 light_origin = vec3(10.0, 5.0, 10.0);
+    float step_size = 0.02;
+    vec3 p = start;
+    bool already_inside = false;
+    float light_factor = 0.0;
     for (int i = 0; i < steps; ++i) {
-        vec3 p = start + direction * traveled;
         float distance = scene(p);
         if (distance < 0.01) {
             vec3 n = normal(p);
             vec3 l = normalize(p - light_origin);
-            float light_factor = dot(n, l);
+            if (!already_inside) {
+                light_factor = dot(n, l);
+                light_factor = min(0.2, light_factor);
+            }
 
-            vec4 in_color = follow_ray_in_emerald(p, -l);
+            emerald_color.x += light_factor;
+            emerald_color.x = clamp(emerald_color.x, 0.1, 0.8);
 
-            vec3 mixed = mix(green, in_color.xyz, in_color.w);
+            vec3 local_p = rotate(p, u.time, 0.0, 1.0);
+            
+            float s = fbm(vec3(local_p.xz, u.time / 10.0), 5, 3.2, 0.5);
 
-            return vec4(mixed * light_factor, 1.0);
+            stormlight_color.x += s / 3.0;
+
+            stormlight_color.x = clamp(stormlight_color.x, 0.0, 0.8);
+
+            if (direction == original_direction) {
+                direction = -l;
+            }
+            step_size = 0.02;
+            already_inside = true;
+        } else{
+            step_size = distance;
         }
-        if (traveled >= max_dist) {
-            break;
-        }
-        traveled += distance;
+        traveled += step_size;
+        p += direction * step_size;
     }
 
-    vec4 in_color = follow_ray_in_emerald(start + direction * u.time / 10.0, direction);
+    if (emerald_color.x < 0.1) {
+        p = start;
+        for (int i = 0; i < steps; ++i) {
+            vec3 local_p = rotate(p, 0.0, 0.0, 2.0);
+            float s = fbm(vec3(local_p.xz * 10.0, u.time / 10.0), 5, 3.2, 0.5);
+            voidlight_color.x += s / 5.0;
 
-    return vec4(in_color.xyz, 1.0);
+            voidlight_color.x = clamp(voidlight_color.x, 0.1, 0.8);
+            p += direction * 0.02;
+        }
+    }
+    vec3 background = background_color(start + original_direction * 20.0);
+    background.x += 0.2;
+
+    float intensity_sum = emerald_color.x + stormlight_color.x + voidlight_color.x + background.x;
+
+    vec3 color = emerald_color * (emerald_color.x / intensity_sum) + stormlight_color * (stormlight_color.x / intensity_sum) + voidlight_color * (voidlight_color.x / intensity_sum) + background * (background.x / intensity_sum);
+    // vec3 color = weightedOklabAverage(vec4(emerald_color, 1.0), vec4(stormlight_color, 1.0), vec4(voidlight_color, 1.0), vec4(background, 3.0));
+
+    return vec4(oklab2rgb(color), 1.0);
 }
 
 vec4 render(vec3 eye, vec3 ray) {
-    return follow_ray(eye, ray, 100, 100.0);
+    return follow_ray(eye, ray, 20);
 }
 
 void main() {
@@ -256,8 +463,7 @@ void main() {
     vec2 pixel_position = ((uv - 0.5) * vec2(1.92, 1.2)) / 1.2;
     vec3 ray_direction = normalize(vec3(pixel_position, 1.0));
 
-    out_color = render(vec3(0.0, 0.0, -10.0), ray_direction);
+    out_color = render(vec3(0.0, 0.0, -5.0), ray_direction);
     // out_color = vec4(pixel_position, 0.0, 1.0);
     // out_color = vec4(sin(sdFbm(vec3(uv * 40.0, 0.0), 7.0)), 0.0, 0.0, 1.0);
 }
-
