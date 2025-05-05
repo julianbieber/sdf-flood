@@ -79,7 +79,7 @@ impl<'a> RenderState<'a> {
                             #[cfg(target_family = "wasm")]
                             required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
                             #[cfg(all(unix, not(target_family = "wasm")))]
-                            required_limits: wgpu::Limits::downlevel_defaults(),
+                            required_limits: wgpu::Limits::default(),
                         },
                         None,
                     )
