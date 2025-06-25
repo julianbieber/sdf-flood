@@ -131,7 +131,7 @@ vec3 march(vec3 ro, vec3 rd) {
             t = 0.0;
             closeby_portal = false;
             portal_hit = true;
-            // rd = refract(rd, n, 0.4);
+            rd = refract(rd, n, 0.01);
         }
         p = ro + rd * t;
         float d = map(p, index);
@@ -160,8 +160,8 @@ void main(){
 
     ray_direction = rotate(ray_direction, 0.0, 0.1 * u.time, 0.0);
 
-    // out_color = vec4(march(vec3(pixel_position + vec2(0.0, 3.0), -10.0) + vec3(0.1, 0.0, 0.2) * u.time, ray_direction), 1.0);
-    out_color = vec4(oklab2rgb(vec3(sin(u.time) * 0.5 + 0.5, world_color(vec2(0.0, u.time)))), 1.0);
+    out_color = vec4(march(vec3(pixel_position + vec2(0.0, 3.0), -10.0) + vec3(0.1, 0.0, 0.2) * u.time, ray_direction), 1.0);
+    // out_color = vec4(oklab2rgb(vec3(sin(u.time) * 0.5 + 0.5, world_color(vec2(0.0, u.time)))), 1.0);
 } 
 
 

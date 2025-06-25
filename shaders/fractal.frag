@@ -86,16 +86,25 @@ vec3 repeated(vec3 p, float s) {
     p = p - round(p / s);
     return p;
 }
-Ob map(vec3 p, float color) {
-    // p = rotate(p, 0.0, u.time, 0.0);
-    Ob a = Ob(sdSphere(p, vec3(3.0, 0.0, 0.0), 1.0), 1.0 + color, false);
-    Ob c = Ob(sdSphere(p, vec3(-3.0, 0.0, 0.0), 1.0), 1.0 + color, false);
-    a = omin(a, c);
-    Ob b = Ob(sdOctahedron(p, 1.0), 0.0 + color, false);
+// Ob map(vec3 p, float color) {
+//     // p = rotate(p, 0.0, u.time, 0.0);
+//     Ob a = Ob(sdSphere(p, vec3(3.0, 0.0, 0.0), 1.0), 1.0 + color, false);
+//     Ob c = Ob(sdSphere(p, vec3(-3.0, 0.0, 0.0), 1.0), 1.0 + color, false);
+//     a = omin(a, c);
+//     Ob b = Ob(sdOctahedron(p, 1.0), 0.0 + color, false);
 
-    return omin(a, b);
-    // return b;
+//     return omin(a, b);
+//     // return b;
+// }
+//
+float sdBox(vec3 p, vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
+Ob map(vec3 p, float color) {
+    return Ob(sdBox(p, vec3(1.0)), color, false);
+}
+
 vec3 foldPlane(vec3 p, vec3 n, float d) {
     // signed distance from p to plane
     float dist = dot(p, n) + d;
@@ -107,25 +116,22 @@ vec3 foldPlane(vec3 p, vec3 n, float d) {
 }
 
 Ob kif_map(vec3 p) {
-    // p.y -= 3.0;
-    // p = repeated(p, 5.0);
     Ob m = Ob(100000.0, 2, false);
-    // p.y = -abs(p.y);
-
-    // p.x = abs(p.x);
-    // p.y = p.y * sign(p.z);
-    // p.y = abs(p.y);
+    // vec3 plane_dir = normalize(vec3(1.0, sin(u.time * 0.2)* PI, (u.time * 0.6)));
+    vec3 plane_dir = normalize(vec3(1.0, u.time, 0.0));
+    float plane = 0.0;
     for (int i = 0; i < 5; ++i) {
-        m = omin(m, map(p, float(i)) );
-        // p.xyz *= 1.2;
-        p.x -= 2.2 * sin(u.time);
-        vec3 plane = normalize(vec3(0.0, 1.0, 0.0));
-        if (mod(i, 2) == 1) {
-            p = foldPlane(p, plane, float(i) * 0.7);
-        } else {
-            p = foldPlane(p, rotate(plane, u.time, 0.0, 0.0), float(i) * -0.6);
-        }
-        p = rotate(p, 0.0, u.time, 0.0);
+        p = foldPlane(p, plane_dir, plane);
+        Ob lm = map(p, float(i));
+        // if (lm.d < m.d) {
+            m = omin(m, lm);
+            // plane += 3.0;
+            // plane_dir = rotate(plane_dir, 0.0,  PI / 2.0, 0.0);
+            p *= 1.5;
+            p += vec3(3.0, 0.0, 0.0);
+        // }
+        // p.y += 0.2;
+        // plane_dir = rotate(plane_dir, 0.5 * PI, 0.8 * PI+ u.time*0.2, 0.7);
     }
 
     return m;
