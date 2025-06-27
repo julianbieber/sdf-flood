@@ -104,7 +104,7 @@ Ob map(vec3 p) {
     c.d *= 0.6;
 
     float storm_radius = sphere(p, 3.8);
-    storm_radius - length(kifs_color(p * T + 0.3)) * 1.3;
+    storm_radius = storm_radius - normalize(kifs_color(p * T)).y * 0.3;
 
     Ob storm = Ob(storm_radius, 1, true);
 
@@ -113,49 +113,6 @@ Ob map(vec3 p) {
     return c;
 }
 
-Ob kifs_map_2(vec3 p) {
-    Ob m = Ob(100000.0, 0, false);
-
-    vec3 plane_dir = normalize(vec3(1.0, sin(T * 0.2) * PI, (T * 0.6)));
-    // float plane = gyroid(vec3(T, 0.3 * T, 0.7*T));
-    float plane = 0.0;
-    for (int i = 0; i < 13; ++i) {
-        vec3 lp = foldPlane(p, plane_dir, plane);
-        plane += 0.2 * float(i);
-        plane_dir = rotate(plane_dir, 0.8 * PI + T * 0.2, 0.7, 0.5 * PI);
-        plane_dir = rotate(plane_dir, 0.5 * PI, 0.8 * PI + T * 0.2, 0.7);
-        // plane_dir = rotate(plane_dir, 0.1 * PI + T * 0.4, 0.1, 0.2 * PI + T * 0.3);
-        // p.z *= 1.19;
-        // p += 0.21;
-
-        m = min_ob(map(lp), m);
-    }
-    return m;
-}
-
-Ob kifs_map_3(vec3 p) {
-    Ob m = Ob(100000.0, 0, false);
-
-    vec3 plane_dir_x = normalize(vec3(1.0, 0.0, 0.0));
-    vec3 plane_dir_y = normalize(vec3(0.0, 1.0, 0.0));
-    vec3 plane_dir_z = normalize(vec3(0.0, 0.0, 1.0));
-    // float plane = gyroid(vec3(T, 0.3 * T, 0.7*T));
-    float plane = 0.0;
-    for (int i = 0; i < 1; ++i) {
-        vec3 lp = p;
-        lp = foldPlane(p - plane_dir_y * 5.0, plane_dir_x, float(i) * 4.0);
-        m = min_ob(map(lp), m);
-        // lp = foldPlane(p - plane_dir_y * 6.0, plane_dir_y, float(i) * 4.0);
-        // m = min_ob(map(lp), m);
-        // lp = foldPlane(p - plane_dir_z * 7.0, plane_dir_z, float(i) * 4.0);
-        // m = min_ob(map(lp), m);
-
-        // p = rotate(p, 0.0, float(i) /6.0 * PI * T, float(i) /6.0 * PI * T);
-
-        p *= 4.0;
-    }
-    return m;
-}
 Ob kifs_map(vec3 p) {
     vec3 plane_dir_x = normalize(vec3(1.0, 0.0, 0.0));
     vec3 plane_dir_y = normalize(vec3(0.0, 1.0, 0.0));
