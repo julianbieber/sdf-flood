@@ -133,6 +133,7 @@ void main(){
     // vec3 rd = normalize(vec3(pixel_position, 1.0));
     //
     vec3 baseColor1 = rgb(8, 118, 253);
+    // vec3 baseColor1 = rgb(166, 47, 32);
     vec3 baseColor2 = rgb(186, 48, 223);
 
     float end = 20.0;
@@ -213,15 +214,36 @@ void main(){
     //
     v *= 10.0;
     // v *= dot(v, v)*T;
+    v += fract(cos(T*12321.0));
 
-    float path = sin(v.x * 10.0 + T) * 0.1 +
-                 sin(v.x * 23.0 + T* 1.3) * 0.05 +
-                 sin(v.x * 47.0 + T* 0.7) * 0.025;
+    float background_intensity_acc = 0.0;
+
+    for (float i = 1.0; i < end; ++i) {
+        float scale = 1.0/i;
+        float path = sin(v.x * 10.0 + 100.0*T) * 0.1 +
+                     sin(v.x * 23.0 + 100.0*T* 1.3) * 0.05 +
+                     sin(v.x * 47.0 + 100.0*T* 0.7) * 0.025;
     
-    float distance = abs(v.y - path);
-    intensity_acc = 1.0 / (distance * 100.0 + 1.0);
+        float lightning_distance = abs(v.y - path);
+        intensity_acc += (1.0 / (lightning_distance * 100.0 + 1.0)) * max(0.0, 0.4 - length(cos(v+T+path+original.x)));
+
+        float background_distance = max(0.0, 3.0 - length(v*background_intensity_acc))*1.0;
+        background_intensity_acc += background_distance * 0.01 * scale;
+
+
+        
+        v = rotate2(v, 0.21*PI*length(original+T));
+        v += intensity_acc*3.0;
+
+        v.y = sin(v.y*2.0);
+    }
 
     vec3 color = baseColor1 * (intensity_acc);
-    out_color = vec4(color, 1.0);
+    vec3 background = baseColor2 * background_intensity_acc;
+    if (intensity_acc > background_intensity_acc) {
+        out_color = vec4(color, 1.0);
+    } else {
+        out_color = vec4(background, 1.0);
+    }
     // out_color = vec4(v, 0.0, 1.0);
 } 
