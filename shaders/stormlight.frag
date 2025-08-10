@@ -21,21 +21,22 @@ layout(binding = 2) readonly buffer SliderParameters {
 #define GOLDEN_RATIO 1.6180339887498948482
 
 const mat3 RGB2OKLAB_A = mat3(
-    0.2104542553, 1.9779984951, 0.0259040371,
-    0.7936177850, -2.4285922050, 0.7827717662,
-    -0.0040720468, 0.4505937099, -0.8086757660);
+        0.2104542553, 1.9779984951, 0.0259040371,
+        0.7936177850, -2.4285922050, 0.7827717662,
+        -0.0040720468, 0.4505937099, -0.8086757660);
 
 const mat3 RGB2OKLAB_B = mat3(
-    0.4122214708, 0.2119034982, 0.0883024619,
-    0.5363325363, 0.6806995451, 0.2817188376,
-    0.0514459929, 0.1073969566, 0.6299787005);
+        0.4122214708, 0.2119034982, 0.0883024619,
+        0.5363325363, 0.6806995451, 0.2817188376,
+        0.0514459929, 0.1073969566, 0.6299787005);
 
 vec3 rgb2oklab(vec3 rgb) {
     vec3 lms = RGB2OKLAB_B * rgb;
-    return RGB2OKLAB_A * (sign(lms)*pow(abs(lms), vec3(0.3333333333333)));
-
+    return RGB2OKLAB_A * (sign(lms) * pow(abs(lms), vec3(0.3333333333333)));
 }
-vec4 rgb2oklab(vec4 rgb) { return vec4(rgb2oklab(rgb.rgb), rgb.a); }
+vec4 rgb2oklab(vec4 rgb) {
+    return vec4(rgb2oklab(rgb.rgb), rgb.a);
+}
 
 const mat3 OKLAB2RGB_A = mat3(
         1.0, 1.0, 1.0,
@@ -202,13 +203,11 @@ float sierpinskiicosahedron_sdf(vec3 z, int iterations) {
     return length(z) * pow(scale, float(-n - 1));
 }
 
-
 float smoothUnion(float d1, float d2, float k) {
     // Polynomial smooth minimum (IQ's original implementation)
     float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
     return mix(d2, d1, h) - k * h * (1.0 - h);
 }
-
 
 // Add rotational symmetry (8-fold for realistic diamond facets)
 vec2 rotate2(vec2 p, float angle) {
@@ -217,47 +216,17 @@ vec2 rotate2(vec2 p, float angle) {
     return mat2(c, -s, s, c) * p;
 }
 
-float sdFacetedDiamond(vec3 p, int facets) {
-    // Base diamond proportions
-    p.y *= 0.65; // Vertical compression
-    vec3 q = abs(p);
-    float base = (q.x + q.y + q.z - 0.8) * 0.577;
-
-    // Crown facets (top section)
-    if (p.y > 0.1) {
-        p.xz = rotate2(p.xz, 3.14159 / float(facets));
-        float crown = length(p.xz * vec2(1.2, 0.8)) - 0.3;
-        base = min(base, crown);
-    }
-
-    // Pavilion facets (bottom section)
-    if (p.y < -0.2) {
-        p.xz = rotate2(p.xz, -3.14159 / float(facets / 2));
-        float pavilion = max(abs(p.x) - 0.25, abs(p.z) - 0.25);
-        base = min(base, pavilion);
-    }
-
-    // Girdle facets using rotati2onal repetition
-    for (int i = 0; i < facets; i++) {
-        float angle = 6.283 * float(i) / float(facets);
-        vec2 rp = rotate2(p.xz, angle);
-        float girdleFacet = max(abs(rp.x) - 0.35, abs(p.y) - 0.15);
-        base = min(base, girdleFacet);
-    }
-
-    return base;
-}
-
 float scene(vec3 p) {
-    float f = abs(fbm(vec3(uv, u.time / 10.0), 5, 1.0, 0.5)); 
-        
+    float f = abs(fbm(vec3(uv, u.time / 10.0), 5, 1.0, 0.5));
+
     vec3 s = vec3(5.0 + sin(time), 5.0, 5.0 + cnoise(vec3(u.time)) * 0.01);
-    vec3 q = p - s*round(p/s);
+    vec3 q = p - s * round(p / s);
 
-    float d = sierpinskiicosahedron_sdf(rotate(q , sin(u.time), u.time, u.time * 0.2 ), int(abs(sin(u.time / 10.0) * 10.0)));
+    float d = sierpinskiicosahedron_sdf(rotate(q, sin(u.time), u.time, u.time * 0.2), 15);
 
-    float d2 = length(q) - 1.5;
-    return mix(d, d2, 0.01);
+    return d;
+    // float d2 = length(q) - 1.3;
+    // return mix(d, d2, abs(sin(u.time)));
     // return length(q) - 1.5;
 }
 
@@ -277,16 +246,42 @@ float intensity_clamp(float i, float steepness) {
     return smoothstep(0.0, steepness, i) / steepness;
 }
 
+vec2 cmap(float x) {
+    return pow(.5 + .5 * cos(PI * x + vec3(2, 3)), vec3(2.5)) - 0.5;
+}
+
+vec3 weave_color(vec3 ro, vec3 rd)  {
+    vec3 color = vec3(0.0);
+    float t = 0.0;
+    for(int i = 0; i < 99; i++)
+    {
+        vec3 p = t * rd + ro;
+        
+        float T = (t+u.time)/5.;
+        float c = cos(T);
+        float s = sin(T);
+        p.xy = mat2(c,-s,s,c) * p.xy;
+        
+        for(float f = 0.; f < 9.; f++) 
+        {
+            float a = exp(f)/exp2(f);
+            p += cos(p.yzx * a + u.time)/a;
+        }
+        float d = 1./50. + abs((ro -p-vec3(0,1,0)).y-1.)/10.;
+        color += cmap(t) * 2e-3 / d;
+        t += d;
+    }
+    return color;
+    
+}
+
 vec3 background_color(vec3 p) {
     vec3 c0 = vec3(0.13, -0.01, -0.07);
     vec3 c1 = vec3(0.16, 0.03, -0.06);
     vec3 c2 = vec3(0.19, 0.05, -0.06);
     vec3 c3 = vec3(0.24, 0.08, -0.05);
     vec3 c4 = vec3(0.30, 0.11, -0.03);
-    float t = abs(fbm(p / 5.0 + vec3(u.time / 1.0) * 0.2, 5, 3.0, 0.4));
-    if (t < 0.5) {
-        return vec3(0.0);
-    }
+    float t = abs(fbm(p * 0.3 + vec3(u.time * 1.1), 5, 5.0, 0.1));
     t = clamp(t, 0.0, 1.0);
     float scaledT = t * 4.0; // Split into 4 intervals
     int index = clamp(int(floor(scaledT)), 0, 3); // Segment index (0-3)
@@ -354,68 +349,79 @@ vec4 follow_ray(vec3 start, vec3 original_direction, int steps) {
             vec3 l = normalize(p - light_origin);
             if (!already_inside) {
                 light_factor = dot(n, l);
-                light_factor = max(0.1, light_factor);
-                emerald_color.x += light_factor;
+                light_factor = max(0.2, light_factor);
+                emerald_color.x += light_factor * 0.7;
             }
 
             vec3 local_p = rotate(p, u.time, 0.0, 1.0);
 
-            float s = abs(fbm(vec3(local_p.xz, u.time / 10.0), 5, 3.2, 0.5));
+            float s = abs(fbm(vec3(local_p.xyz) + u.time * 0.3, 5, 3.2, 0.5));
 
             stormlight_color.x += s;
 
-            // stormlight_color.x = clamp(stormlight_color.x, 0.0, 0.8);
+            if (stormlight_color.x > 0.6) {
+                break;
+            }
 
             if (direction == original_direction) {
-                // direction = reflect(direction, n);
+                direction = reflect(direction, n);
             }
-            step_size = 0.002;
+            step_size = 0.02;
             already_inside = true;
         } else {
-            step_size = distance;
+            step_size = distance * 0.6;
         }
         traveled += step_size;
         p += direction * step_size;
     }
 
-    stormlight_color.x = sigmoid(stormlight_color.x);
+    // stormlight_color.x = sigmoid(stormlight_color.x);
     if (!already_inside) {
         p = start;
         for (int i = 0; i < steps; ++i) {
             vec3 local_p = rotate(p, 0.0, 0.0, 0.0);
-            float s = abs(fbm(vec3(local_p.xyz ), 5, 3.2, 0.5));
-            if (s > 0.7 && s < 0.9) {
+            float s = abs(fbm(vec3(local_p.xyz * 0.2 + u.time * 0.1), 5, 3.2, 0.5));
+            if (s > 0.2 && s < 1.9) {
                 voidlight_color.x += s;
             }
-            p += direction * 0.02;
+            p += direction * 0.2;
         }
     }
-    voidlight_color.x = sigmoid(voidlight_color.x);
-    vec3 background= vec3(0.0);
-    if (voidlight_color.x > 0.0) {
-        background = background_color(start + original_direction * 20.0);
+    voidlight_color.x = pow(2.0, -voidlight_color.x);
+    vec3 background = vec3(0.0);
+    background = background_color(start + original_direction * 20.0);
+    background.x *= 1.7;
 
-        background.x *= pow(PI, 1.0+background.x);
+    // background.x *= pow(PI, -1.0+background.x);
+
+    vec3 color;
+
+    if (emerald_color.x > 0.1) {
+        float intensity_sum = emerald_color.x + stormlight_color.x;
+        // color = emerald_color * (emerald_color.x / intensity_sum) + stormlight_color * (stormlight_color.x / intensity_sum);
+        return vec4(weave_color(start, original_direction), 0.0);
+    } else {
+        float intensity_sum = voidlight_color.x + background.x;
+        color = voidlight_color * (voidlight_color.x / intensity_sum) + background * (background.x / intensity_sum);
     }
-
-    float intensity_sum = emerald_color.x + stormlight_color.x + voidlight_color.x + background.x;
-
-    vec3 color = emerald_color * (emerald_color.x / intensity_sum) + stormlight_color * (stormlight_color.x / intensity_sum) + voidlight_color * (voidlight_color.x / intensity_sum) + background * (background.x / intensity_sum);
     // vec3 color = weightedOklabAverage(vec4(emerald_color, 1.0), vec4(stormlight_color, 1.0), vec4(voidlight_color, 1.0), vec4(background, 3.0));
 
     return vec4(oklab2rgb(color), 1.0);
 }
 
 vec4 render(vec3 eye, vec3 ray) {
-    return follow_ray(eye, ray, 20);
+    return follow_ray(eye, ray, 50);
 }
 
 void main() {
     float fov = fov_factor();
     vec2 pixel_position = ((uv - 0.5) * vec2(1.92, 1.2)) / 1.2;
-    vec3 ray_direction = rotate(normalize(vec3(pixel_position, 1.0)), sin(u.time * 0.2), u.time * 0.1, 0.0);
+    // vec3 ray_direction = rotate(normalize(vec3(pixel_position, 1.0)), sin(u.time * 0.2), u.time * 0.1, 0.0);
 
-    out_color = render(vec3(0.0, 0.0, -4.0) + ray_direction * -u.time, ray_direction);
+    // out_color = render(vec3(0.0, 0.0, -4.0) + ray_direction * -u.time, ray_direction);
+    vec3 ray_direction = rotate(normalize(vec3(pixel_position, 1.0)), 0.0, 0.0, 0.0);
+
+    out_color = render(vec3(0.0, 0.0, -4.0) + (ray_direction * vec3(0.1, 0.1, 1.9)), ray_direction);
     // out_color = vec4(pixel_position, 0.0, 1.0);
     // out_color = vec4(sin(sdFbm(vec3(uv * 40.0, 0.0), 7.0)), 0.0, 0.0, 1.0);
 }
