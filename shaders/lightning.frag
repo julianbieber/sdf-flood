@@ -212,9 +212,11 @@ void main(){
         
     // }
     //
-    v *= 10.0;
+    v *= 10.0+T;
     // v *= dot(v, v)*T;
-    v += fract(cos(T*12321.0));
+    // v *= fract(cos(T*32143.1));
+    v = rotate2(v, T);
+    // v += fract(cos(T*12143.1+v.x))*0.1;
 
     float background_intensity_acc = 0.0;
 
@@ -223,27 +225,40 @@ void main(){
         float path = sin(v.x * 10.0 + 100.0*T) * 0.1 +
                      sin(v.x * 23.0 + 100.0*T* 1.3) * 0.05 +
                      sin(v.x * 47.0 + 100.0*T* 0.7) * 0.025;
-    
+
         float lightning_distance = abs(v.y - path);
-        intensity_acc += (1.0 / (lightning_distance * 100.0 + 1.0)) * max(0.0, 0.4 - length(cos(v+T+path+original.x)));
+        float glow = exp(-lightning_distance-0.1); 
+        glow = 1.0;
 
-        float background_distance = max(0.0, 3.0 - length(v*background_intensity_acc))*1.0;
+        vec2 focus_v = original*10.0;
+        focus_v += i*0.1+sin(T);
+
+        // focus_v += abs(sin(focus_v*6.0 + T*10.0 + v.x));
+        // focus_v = rotate2(focus_v, lightning_distance);
+
+        float focus_distance = max(0.0, 1.0 - length(focus_v));
+        focus_distance = 1.0;
+        intensity_acc += (1.0 / (lightning_distance * 100.0 + 1.0)) * glow * focus_distance;
+        // intensity_acc += glow;
+
+
+        float background_distance = max(0.0, 3.0 - length(v*background_intensity_acc))*glow*2.0*exp(-intensity_acc);
         background_intensity_acc += background_distance * 0.01 * scale;
-
-
         
-        v = rotate2(v, 0.21*PI*length(original+T));
-        v += intensity_acc*3.0;
+        // v = rotate2(v, 1.0/end*2.0*PI+original.x*10.0);
+        v = rotate2(v, PI * (1.0 - lightning_distance)*scale);
+        // v += intensity_acc*3.0*sin(T);
 
-        v.y = sin(v.y*2.0);
+        // v.y = sin(v.y*2.0);
     }
 
     vec3 color = baseColor1 * (intensity_acc);
     vec3 background = baseColor2 * background_intensity_acc;
-    if (intensity_acc > background_intensity_acc) {
-        out_color = vec4(color, 1.0);
-    } else {
-        out_color = vec4(background, 1.0);
-    }
+    out_color = vec4(mix(color, background, 1.0-intensity_acc), 1.0);
+    // if (intensity_acc > background_intensity_acc) {
+    //     out_color = vec4(color, 1.0);
+    // } else {
+    //     out_color = vec4(background, 1.0);
+    // }
     // out_color = vec4(v, 0.0, 1.0);
 } 
