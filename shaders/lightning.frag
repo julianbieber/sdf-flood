@@ -32,97 +32,70 @@ float hash(vec3 p) {
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-struct Ob {
-    float d;
-    int c;
-    bool density;
-};
-
-Ob min_ob(Ob a, Ob b) {
-    if (a.density) {
-        a.d = max(0.0, a.d);
-    }
-    if (b.density) {
-        b.d = max(0.0, b.d);
-    }
-    if (a.d <= b.d) {
-        return a;
-    } else {
-        return b;
-    }
-}
-
-Ob max_ob(Ob a, Ob b) {
-    if (a.density) {
-        a.d = max(0.0, a.d);
-    }
-    if (b.density) {
-        b.d = max(0.0, b.d);
-    }
-    if (a.d >= b.d) {
-        return a;
-    } else {
-        return b;
-    }
-}
-
-vec3 foldPlane(vec3 p, vec3 n, float d) {
-    float dist = dot((p), n) + d;
-    if (dist < 0.0) {
-        p -= 2.0 * dist * n;
-    }
-    return p;
-}
-
-vec3 rotate(vec3 p, float yaw, float pitch, float roll) {
-    return (mat3(cos(yaw), -sin(yaw), 0.0, sin(yaw), cos(yaw), 0.0, 0.0, 0.0, 1.0) * 
-        mat3(cos(pitch), 0.0, sin(pitch), 0.0, 1.0, 0.0, -sin(pitch), 0.0, cos(pitch)) * 
-        mat3(1.0,0.0,0.0,0.0, cos(roll), -sin(roll),0.0, sin(roll), cos(roll))) * 
-        p;
-}
 vec2 rotate2(vec2 p, float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * 
         p;
-}
-float sphere(vec3 p,float radius) {
-    return length(p) - radius;
-}
-
-Ob map(vec3 p) {
-    return Ob(sphere(p, 1.0), 0, false);
-}
-
-vec3 normal( in vec3 p ) // for function f(p)
-{
-    const float eps = 0.0001; // or some other value
-    const vec2 h = vec2(eps,0);
-    return normalize( vec3(map(p+h.xyy).d - map(p-h.xyy).d,
-                           map(p+h.yxy).d - map(p-h.yxy).d,
-                           map(p+h.yyx).d - map(p-h.yyx).d ) );
-}
-
-vec3 march(vec3 ro, vec3 rd) {
-    float t = 0.0;
-    for (int i = 0; i < 100; ++i) {
-        vec3 p = ro + rd * t;
-        
-        Ob o = map(p);
-
-        if (o.d < 0.001) {
-            vec3 n = normal(p);
-            float i = dot(n, vec3(0.0, 1.0, 0.0));
-            return vec3(1.0) * i;
-        }
-
-        t += o.d;
-    }
-
-    return vec3(0.0);
 }
 
 
 float gy(vec2 a, vec2 b) {
     return dot(sin(a), cos(b.yx));
+}
+
+
+vec3 lighning(vec2 v) {
+    vec3 baseColor1 = rgb(8, 118, 253);
+    vec3 baseColor2 = rgb(186, 48, 223);
+
+    float end = 20.0;
+
+    float intensity_acc = 0.0;
+    float inverse_intensity_acc = 0.0;
+
+    vec2 original = v;
+    v *= 10.0+T;
+    // v *= dot(v, v)*T;
+    // v *= fract(cos(T*32143.1));
+    v = rotate2(v, T);
+    // v += fract(cos(T*12143.1+v.x))*0.1;
+
+    float background_intensity_acc = 0.0;
+
+    for (float i = 1.0; i < end; ++i) {
+        float scale = 1.0/i;
+        float path = sin(v.x * 10.0 + 100.0*T) * 0.1 +
+                     sin(v.x * 23.0 + 100.0*T* 1.3) * 0.05 +
+                     sin(v.x * 47.0 + 100.0*T* 0.7) * 0.025;
+
+        float lightning_distance = abs(v.y - path);
+        float glow = exp(-lightning_distance-0.1); 
+        glow = 1.0;
+
+        vec2 focus_v = original*10.0;
+        focus_v += i*0.1+sin(T);
+
+        // focus_v += abs(sin(focus_v*6.0 + T*10.0 + v.x));
+        // focus_v = rotate2(focus_v, lightning_distance);
+
+        float focus_distance = max(0.0, 1.0 - length(focus_v));
+        focus_distance = 1.0;
+        intensity_acc += (1.0 / (lightning_distance * 100.0 + 1.0)) * glow * focus_distance;
+        // intensity_acc += glow;
+
+
+        float background_distance = max(0.0, 3.0 - length(v*background_intensity_acc))*glow*2.0*exp(-intensity_acc);
+        background_intensity_acc += background_distance * 0.01 * scale;
+        
+        // v = rotate2(v, 1.0/end*2.0*PI+original.x*10.0);
+        v = rotate2(v, PI * (1.0 - lightning_distance)*scale);
+        // v += intensity_acc*3.0*sin(T);
+
+        // v.y = sin(v.y*2.0);
+    }
+
+    vec3 color = baseColor1 * (intensity_acc);
+    vec3 background = baseColor2 * background_intensity_acc;
+    return mix(color, background, 1.0-intensity_acc);
 }
 
 void main(){
