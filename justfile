@@ -1,3 +1,5 @@
+set shell := ["bash", "-uc"]
+
 # Default recipe that shows help
 default:
     @just --list
@@ -39,6 +41,14 @@ check:
 # Run clippy linter
 clippy:
     cargo clippy
+
+new-shader name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    src="./shaders/empty.frag"
+    dst="./shaders/{{name}}.frag"
+    test -e "$dst" || cp "$src" "$dst"
+
 
 # Show project information
 info:
