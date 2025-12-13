@@ -65,8 +65,47 @@ float billow_dot(vec3 x, float r) {
     return acc;
 }
 
+float box(vec3 p, vec3 b) {
+    vec3 q = abs(p) - b;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+vec3 foldPlane(vec3 p, vec3 n, float d) {
+    // signed distance from p to plane
+    float dist = dot(p, n) + d;
+    // if on positive side, reflect across plane
+    if (dist < 0.0) {
+        p -= 2.0 * dist * n;
+    }
+    return p;
+}
+
 float ground(vec3 p) {
-    return p.y + 1.0 - abs(billow_dot(vec3(p.xz * 0.2, T), 1.0)) * 1.2;
+    float plane = p.y + 2.0;
+    p.y += 1.0;
+
+    float house = box(p, vec3(1.0, 1.0, 1.0));
+
+    vec3 kif_p = p;
+
+    for (int i = 0; i < 5; ++i) {
+
+        float random_size = abs(dotnoise(vec3(i,i,i), 2.0));
+
+        kif_p = foldPlane(kif_p, vec3(0.0, 0.0, 1.0), 2.0);
+        house = min(house, box(kif_p, vec3(random_size, random_size, random_size)));
+        kif_p = foldPlane(kif_p, vec3(1.0, 0.0, 0.0), 3.0);
+        house = min(house, box(kif_p, vec3(random_size, random_size, random_size)));
+
+        kif_p *= rot(0.0, PI, 0.0);
+        kif_p.x += 1.0;
+
+
+        
+    }
+
+
+    return min(plane, house);
 }
 
 vec3 ground_normal(vec3 p) {
@@ -85,7 +124,11 @@ vec3 ground_color(vec3 p) {
     vec3 n = ground_normal(p);
     float i = dot(n, normalize(vec3(T, T, T)));
 
-    return (vec3(0.5, 0.2, 0.2) + vec3(0.1, 0.1, 0.1) * cos_scaled(vec3(0.2, 0.5, 0.5) * (p.y - 2.0) + vec3(0.0)) * (1.0 - tanh(T))) * i;
+    if (n.z < -0.3 && hash(p) < 0.01) {
+        return vec3(1.0);
+    }
+
+    return (vec3(0.5, 0.2, 0.2) + vec3(0.1, 0.1, 0.1) * cos_scaled(vec3(0.2, 0.5, 0.5) * (p.xyz - 2.0) + vec3(0.0)) * (1.0 - tanh(T))) * i;
 }
 
 float water_level(vec3 p) {
@@ -117,16 +160,16 @@ void main() {
 
         float gd = ground(p);
         if (gd < 0.003) {
-            if (water_level(p) < 0.001) {
-                rd = refract(rd, vec3(0.0, 1.0, 0.0), hash(p*0.001)*0.1);
-                rd = reflect(rd, vec3(0.0, 1.0, 0.0));
-                ro = p + rd * 0.3;
-                t = 0.2;
-                ground_factor = 0.2;
-            } else {
+            // if (water_level(p) < 0.001) {
+            //     rd = refract(rd, vec3(0.0, 1.0, 0.0), hash(p*0.001)*0.1);
+            //     rd = reflect(rd, vec3(0.0, 1.0, 0.0));
+            //     ro = p + rd * 0.3;
+            //     t = 0.2;
+            //     ground_factor = 0.2;
+            // } else {
                 ground_factor = 1.0;
                 break;
-            }
+            // }
         }
 
         if (t > 50.0) {
